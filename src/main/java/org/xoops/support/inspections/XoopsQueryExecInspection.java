@@ -18,8 +18,9 @@ import java.util.regex.Pattern;
  */
 public final class XoopsQueryExecInspection extends LocalInspectionTool {
 
-    private static final Pattern QUERY_CALL = Pattern.compile(
-            "->\\s*(query)\\s*\\(\\s*([\"'])([\\s\\S]*?)\\2",
+    /** Match method name only on comment-masked code; SQL comes from original text. */
+    private static final Pattern QUERY_METHOD = Pattern.compile(
+            "->\\s*(query)\\s*\\(",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -35,40 +36,41 @@ public final class XoopsQueryExecInspection extends LocalInspectionTool {
                     return;
                 }
                 String text = file.getText();
-                String code = PhpTextUtil.maskCommentsAndStrings(text);
-                Matcher m = QUERY_CALL.matcher(code);
+                // Mask comments only so call structure is found; SQL literals stay in original.
+                String code = PhpTextUtil.maskCommentsOnly(text);
+                Matcher m = QUERY_METHOD.matcher(code);
                 while (m.find()) {
-                    // Recover SQL from original (code has strings masked).
-                    int openParen = text.indexOf('(', m.end(1) - 1);
+                    int nameStart = m.start(1);
+                    int nameEnd = m.end(1);
+                    int openParen = m.end() - 1;
+                    if (openParen < 0 || openParen >= text.length() || text.charAt(openParen) != '(') {
+                        openParen = text.indexOf('(', nameEnd - 1);
+                    }
                     if (openParen < 0) {
                         continue;
                     }
-                    int commas = PhpTextUtil.countTopLevelCommasInCall(text, openParen);
-                    int sqlStart = m.start(3);
-                    int sqlEnd = m.end(3);
-                    if (sqlStart < 0 || sqlEnd > text.length()) {
+                    String sql = PhpTextUtil.firstStringArgContent(text, openParen);
+                    if (sql == null) {
                         continue;
                     }
-                    String sql = text.substring(sqlStart, sqlEnd).trim().toUpperCase(Locale.ROOT);
-                    if (!(sql.startsWith("INSERT")
-                            || sql.startsWith("UPDATE")
-                            || sql.startsWith("DELETE")
-                            || sql.startsWith("REPLACE")
-                            || sql.startsWith("TRUNCATE")
-                            || sql.startsWith("ALTER")
-                            || sql.startsWith("DROP")
-                            || sql.startsWith("CREATE"))) {
+                    String sqlUpper = sql.trim().toUpperCase(Locale.ROOT);
+                    if (!(sqlUpper.startsWith("INSERT")
+                            || sqlUpper.startsWith("UPDATE")
+                            || sqlUpper.startsWith("DELETE")
+                            || sqlUpper.startsWith("REPLACE")
+                            || sqlUpper.startsWith("TRUNCATE")
+                            || sqlUpper.startsWith("ALTER")
+                            || sqlUpper.startsWith("DROP")
+                            || sqlUpper.startsWith("CREATE"))) {
                         continue;
                     }
-                    int nameStart = m.start(1);
-                    int nameEnd = m.end(1);
                     PsiElement leaf = PhpTextUtil.leafAt(file, nameStart);
                     if (leaf == null) {
                         continue;
                     }
                     String expected = text.substring(nameStart, nameEnd);
+                    int commas = PhpTextUtil.countTopLevelCommasInCall(text, openParen);
                     if (commas != 0) {
-                        // Multi-arg query($sql, $limit, $start) — cannot rename to exec() safely.
                         holder.registerProblem(
                                 leaf,
                                 "XOOPS: mutating SQL must use exec(), not query() "

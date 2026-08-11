@@ -49,14 +49,88 @@ final class PhpTextUtil {
     }
 
     /**
-     * Mask comments and string/heredoc-like quoted regions with spaces so regex
-     * matches keep the same offsets but cannot hit non-code.
+     * Mask comments only (keep string/heredoc contents) so call-site patterns that
+     * need literal tokens still work while ignoring commented-out code.
+     */
+    static @NotNull String maskCommentsOnly(@NotNull String text) {
+        return maskInternal(text, false);
+    }
+
+    /**
+     * Mask comments, quoted strings, and heredoc/nowdoc bodies with spaces so
+     * regex matches keep the same offsets but cannot hit non-code.
      */
     static @NotNull String maskCommentsAndStrings(@NotNull String text) {
+        return maskInternal(text, true);
+    }
+
+    private static @NotNull String maskInternal(@NotNull String text, boolean maskStrings) {
         char[] chars = text.toCharArray();
         int i = 0;
         int n = chars.length;
         while (i < n) {
+            // Heredoc / nowdoc: <<<IDENT  <<<'IDENT'  <<<"IDENT"
+            if (maskStrings && i + 3 < n && chars[i] == '<' && chars[i + 1] == '<' && chars[i + 2] == '<') {
+                int start = i;
+                i += 3;
+                while (i < n && (chars[i] == ' ' || chars[i] == '\t')) {
+                    i++;
+                }
+                boolean nowdoc = false;
+                boolean quoted = false;
+                char quote = 0;
+                if (i < n && (chars[i] == '\'' || chars[i] == '"')) {
+                    nowdoc = chars[i] == '\'';
+                    quoted = true;
+                    quote = chars[i];
+                    i++;
+                }
+                int idStart = i;
+                while (i < n && (Character.isLetterOrDigit(chars[i]) || chars[i] == '_')) {
+                    i++;
+                }
+                if (i == idStart) {
+                    // Not a valid heredoc — treat '<<<' as ordinary chars
+                    i = start + 1;
+                    continue;
+                }
+                String ident = text.substring(idStart, i);
+                if (quoted && i < n && chars[i] == quote) {
+                    i++;
+                }
+                // mask declaration through end of line
+                while (start < i) {
+                    chars[start++] = ' ';
+                }
+                while (i < n && chars[i] != '\n') {
+                    chars[i++] = ' ';
+                }
+                if (i < n && chars[i] == '\n') {
+                    chars[i++] = ' ';
+                }
+                // body until a line that is only IDENT or IDENT;
+                while (i < n) {
+                    int lineStart = i;
+                    while (i < n && chars[i] != '\n') {
+                        i++;
+                    }
+                    String line = text.substring(lineStart, i);
+                    String trimmed = line.stripTrailing();
+                    // optional leading whitespace then IDENT optional ;
+                    String body = trimmed.stripLeading();
+                    boolean closer = body.equals(ident) || body.equals(ident + ";");
+                    for (int k = lineStart; k < i; k++) {
+                        chars[k] = ' ';
+                    }
+                    if (i < n && chars[i] == '\n') {
+                        chars[i++] = ' ';
+                    }
+                    if (closer) {
+                        break;
+                    }
+                }
+                continue;
+            }
             // // line comment
             if (i + 1 < n && chars[i] == '/' && chars[i + 1] == '/') {
                 while (i < n && chars[i] != '\n') {
@@ -82,6 +156,10 @@ final class PhpTextUtil {
                     chars[i++] = ' ';
                     chars[i++] = ' ';
                 }
+                continue;
+            }
+            if (!maskStrings) {
+                i++;
                 continue;
             }
             // single-quoted string
@@ -121,6 +199,43 @@ final class PhpTextUtil {
             i++;
         }
         return new String(chars);
+    }
+
+    /**
+     * First string-literal argument after {@code openParen} ('...' or "...").
+     * Returns content without quotes, or null if the first arg is not a string.
+     */
+    static @Nullable String firstStringArgContent(@NotNull String text, int openParenIndex) {
+        if (openParenIndex < 0 || openParenIndex >= text.length() || text.charAt(openParenIndex) != '(') {
+            return null;
+        }
+        int i = openParenIndex + 1;
+        while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
+            i++;
+        }
+        if (i >= text.length()) {
+            return null;
+        }
+        char q = text.charAt(i);
+        if (q != '\'' && q != '"') {
+            return null;
+        }
+        i++;
+        StringBuilder sb = new StringBuilder();
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == '\\' && i + 1 < text.length()) {
+                sb.append(text.charAt(i + 1));
+                i += 2;
+                continue;
+            }
+            if (c == q) {
+                return sb.toString();
+            }
+            sb.append(c);
+            i++;
+        }
+        return null;
     }
 
     /**

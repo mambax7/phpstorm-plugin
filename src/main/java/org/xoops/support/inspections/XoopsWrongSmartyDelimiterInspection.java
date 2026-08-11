@@ -85,10 +85,13 @@ public final class XoopsWrongSmartyDelimiterInspection extends LocalInspectionTo
                 }
                 continue;
             }
-            int lit = lower.indexOf("<{literal}>", i);
-            int close = lower.indexOf("</{literal}>", i);
+            // XOOPS/Smarty close tag is <{/literal}>, not </{literal}>
+            final String litOpen = "<{literal}>";
+            final String litClose = "<{/literal}>";
+            int lit = lower.indexOf(litOpen, i);
             if (lit == i) {
-                int end = close >= 0 ? close + "</{literal}>".length() : chars.length;
+                int close = lower.indexOf(litClose, i + litOpen.length());
+                int end = close >= 0 ? close + litClose.length() : chars.length;
                 while (i < end) {
                     chars[i++] = ' ';
                 }

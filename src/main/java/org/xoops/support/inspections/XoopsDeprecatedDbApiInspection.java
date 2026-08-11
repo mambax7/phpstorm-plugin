@@ -24,11 +24,6 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final Pattern QUERY_F_SQL = Pattern.compile(
-            "->\\s*queryF\\s*\\(\\s*([\"'])([\\s\\S]*?)\\1",
-            Pattern.CASE_INSENSITIVE
-    );
-
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
         return new PsiElementVisitor() {
@@ -41,7 +36,8 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
                     return;
                 }
                 String text = file.getText();
-                String code = PhpTextUtil.maskCommentsAndStrings(text);
+                // Comments masked so commented-out calls are ignored; SQL read from original.
+                String code = PhpTextUtil.maskCommentsOnly(text);
                 Matcher m = DEPRECATED.matcher(code);
                 while (m.find()) {
                     String method = m.group(1);
@@ -62,36 +58,33 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
                         );
                         continue;
                     }
-                    // Find '(' after method name in original text
-                    int openParen = text.indexOf('(', nameEnd - 1);
+
+                    int openParen = m.end() - 1;
+                    if (openParen < 0 || openParen >= text.length() || text.charAt(openParen) != '(') {
+                        openParen = text.indexOf('(', nameEnd - 1);
+                    }
                     if (openParen < 0) {
-                        openParen = m.end() - 1;
+                        continue;
                     }
                     int extraCommas = PhpTextUtil.countTopLevelCommasInCall(text, openParen);
                     boolean singleArg = extraCommas == 0;
 
-                    String message = "XOOPS: queryF() is deprecated - use query() for SELECT, exec() for mutations";
-                    Matcher sqlMatch = QUERY_F_SQL.matcher(code.substring(m.start()));
+                    String sql = PhpTextUtil.firstStringArgContent(text, openParen);
                     boolean knownMutation = false;
                     boolean knownSelect = false;
-                    if (sqlMatch.lookingAt()) {
-                        String sql = sqlMatch.group(2).trim().toUpperCase(Locale.ROOT);
-                        // group 2 is masked if it was a string — recover from original
-                        int sqlStart = m.start() + sqlMatch.start(2);
-                        int sqlEnd = m.start() + sqlMatch.end(2);
-                        if (sqlStart >= 0 && sqlEnd <= text.length()) {
-                            sql = text.substring(sqlStart, sqlEnd).trim().toUpperCase(Locale.ROOT);
-                        }
-                        if (sql.startsWith("INSERT") || sql.startsWith("UPDATE") || sql.startsWith("DELETE")
-                                || sql.startsWith("REPLACE") || sql.startsWith("TRUNCATE")
-                                || sql.startsWith("ALTER") || sql.startsWith("DROP") || sql.startsWith("CREATE")) {
+                    if (sql != null) {
+                        String upper = sql.trim().toUpperCase(Locale.ROOT);
+                        if (upper.startsWith("INSERT") || upper.startsWith("UPDATE") || upper.startsWith("DELETE")
+                                || upper.startsWith("REPLACE") || upper.startsWith("TRUNCATE")
+                                || upper.startsWith("ALTER") || upper.startsWith("DROP") || upper.startsWith("CREATE")) {
                             knownMutation = true;
-                        } else if (sql.startsWith("SELECT") || sql.startsWith("SHOW") || sql.startsWith("DESCRIBE")
-                                || sql.startsWith("EXPLAIN")) {
+                        } else if (upper.startsWith("SELECT") || upper.startsWith("SHOW")
+                                || upper.startsWith("DESCRIBE") || upper.startsWith("EXPLAIN")) {
                             knownSelect = true;
                         }
                     }
 
+                    String message = "XOOPS: queryF() is deprecated - use query() for SELECT, exec() for mutations";
                     LocalQuickFix toQuery = new ReplaceRangeQuickFix(
                             "Replace queryF() with query()", nameStart, nameEnd, "query", expectedName);
                     // exec($sql) only — never leave $limit/$start on exec()
@@ -100,7 +93,10 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
                             "Replace queryF() with exec()", nameStart, nameEnd, "exec", expectedName)
                             : null;
 
-                    if (knownMutation && toExec != null) {
+                    if (knownSelect) {
+                        // Never offer exec() for SELECT (or other read) SQL.
+                        holder.registerProblem(leaf, message, toQuery);
+                    } else if (knownMutation && toExec != null) {
                         holder.registerProblem(leaf, message, toExec, toQuery);
                     } else if (knownMutation) {
                         holder.registerProblem(
@@ -108,8 +104,6 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
                                 message + " (multi-arg call: rename to query() only, or drop limit args for exec())",
                                 toQuery
                         );
-                    } else if (knownSelect) {
-                        holder.registerProblem(leaf, message, toQuery);
                     } else if (toExec != null) {
                         holder.registerProblem(leaf, message, toQuery, toExec);
                     } else {

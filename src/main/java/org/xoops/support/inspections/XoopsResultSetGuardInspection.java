@@ -41,12 +41,14 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     return;
                 }
                 String text = file.getText();
-                Matcher m = FETCH.matcher(text);
+                // Match fetches outside comments/strings; offsets align with original text.
+                String code = PhpTextUtil.maskCommentsAndStrings(text);
+                Matcher m = FETCH.matcher(code);
                 while (m.find()) {
-                    String dbExpr = m.group(1).replaceAll("\\s+", "");
-                    String resultVar = m.group(3);
-                    // Only the code immediately before the fetch (comment-stripped).
-                    String before = PhpTextUtil.maskCommentsAndStrings(text.substring(0, m.start()));
+                    // Recover identifiers from original source (masked region is spaces for strings only).
+                    String dbExpr = text.substring(m.start(1), m.end(1)).replaceAll("\\s+", "");
+                    String resultVar = text.substring(m.start(3), m.end(3));
+                    String before = code.substring(0, m.start());
                     if (isFetchAlreadyGuarded(before, resultVar)) {
                         continue;
                     }

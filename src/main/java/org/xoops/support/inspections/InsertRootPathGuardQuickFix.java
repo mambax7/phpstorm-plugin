@@ -13,18 +13,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Inserts a file-leading XOOPS_ROOT_PATH guard after a leading {@code <?php} tag only.
- * Does not insert after {@code <?=} or mid-file tags that follow emitted content.
+ * Inserts a file-leading XOOPS_ROOT_PATH guard after a leading PHP open tag.
+ * Handles {@code <?php}, short {@code <?}, and {@code <?=} without double open tags.
  */
 public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
 
     private static final String GUARD = "defined('XOOPS_ROOT_PATH') || exit('Restricted access');\n";
     private static final Pattern OPEN_PHP = Pattern.compile("<\\?php\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern OPEN_ECHO = Pattern.compile("<\\?=", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ROOT_PATH_GUARD = Pattern.compile(
-            "defined\\s*\\(\\s*['\"]XOOPS_ROOT_PATH['\"]\\s*\\)",
-            Pattern.CASE_INSENSITIVE
-    );
+    /** Short open tag: {@code <?} not followed by php or = */
+    private static final Pattern OPEN_SHORT = Pattern.compile("<\\?(?!php|=)", Pattern.CASE_INSENSITIVE);
 
     @Override
     public @NotNull String getFamilyName() {
@@ -50,45 +48,58 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             return;
         }
 
-        // Prefer a file-leading <?php (only whitespace/BOM before it).
+        // Prefer a file-leading <?php
         Matcher php = OPEN_PHP.matcher(text);
-        if (php.find()) {
-            String prefix = text.substring(0, php.start());
-            if (!prefix.isBlank() && !prefix.replace("\uFEFF", "").isBlank()) {
-                // Tag is not at file start — refuse rather than corrupt mixed content.
-                return;
-            }
-            int insertAt = php.end();
-            if (insertAt < text.length() && text.charAt(insertAt) == '\r') {
-                insertAt++;
-            }
-            if (insertAt < text.length() && text.charAt(insertAt) == '\n') {
-                insertAt++;
-            } else {
-                document.insertString(insertAt, "\n");
-                insertAt++;
-            }
-            document.insertString(insertAt, GUARD);
-            PsiDocumentManager.getInstance(project).commitDocument(document);
+        if (php.find() && isLeadingTag(text, php.start())) {
+            insertGuardAfter(document, project, php.end());
             return;
         }
 
-        // Leading <?= : insert a separate <?php guard block before it.
+        // Leading short <? (not <?php / <?=): insert GUARD after the tag
+        Matcher shortTag = OPEN_SHORT.matcher(text);
+        if (shortTag.find() && isLeadingTag(text, shortTag.start())) {
+            insertGuardAfter(document, project, shortTag.end());
+            return;
+        }
+
+        // Leading <?= : insert a separate <?php guard block before it (no second short tag)
         Matcher echo = OPEN_ECHO.matcher(text);
-        if (echo.find()) {
-            String prefix = text.substring(0, echo.start());
-            if (!prefix.isBlank() && !prefix.replace("\uFEFF", "").isBlank()) {
-                return;
-            }
+        if (echo.find() && isLeadingTag(text, echo.start())) {
             document.insertString(echo.start(), "<?php\n" + GUARD + "?>\n");
             PsiDocumentManager.getInstance(project).commitDocument(document);
             return;
         }
 
-        // No open tag — prepend full block.
-        if (!ROOT_PATH_GUARD.matcher(text).find()) {
+        // No recognized leading open tag — only prepend if file has no PHP open at all
+        if (!text.contains("<?")) {
             document.insertString(0, "<?php\n" + GUARD);
             PsiDocumentManager.getInstance(project).commitDocument(document);
         }
+        // Otherwise decline rather than prepend a second opening tag mid-file.
+    }
+
+    private static boolean isLeadingTag(@NotNull String text, int tagStart) {
+        String prefix = text.substring(0, tagStart).replace("\uFEFF", "");
+        return prefix.isBlank();
+    }
+
+    private static void insertGuardAfter(
+            @NotNull Document document,
+            @NotNull Project project,
+            int tagEnd
+    ) {
+        int insertAt = tagEnd;
+        CharSequence seq = document.getCharsSequence();
+        if (insertAt < seq.length() && seq.charAt(insertAt) == '\r') {
+            insertAt++;
+        }
+        if (insertAt < seq.length() && seq.charAt(insertAt) == '\n') {
+            insertAt++;
+        } else {
+            document.insertString(insertAt, "\n");
+            insertAt++;
+        }
+        document.insertString(insertAt, GUARD);
+        PsiDocumentManager.getInstance(project).commitDocument(document);
     }
 }

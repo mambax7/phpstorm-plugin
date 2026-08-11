@@ -105,7 +105,8 @@ public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
             return false;
         }
         String after = text.substring(open.end());
-        String code = PhpTextUtil.maskCommentsAndStrings(after).stripLeading();
+        // Mask comments only — keep string literals so defined('XOOPS_ROOT_PATH') remains matchable.
+        String code = PhpTextUtil.maskCommentsOnly(after).stripLeading();
         // Drop BOM / declare(strict_types=1); if present as first statement
         code = stripLeadingDeclare(code);
         return GUARD_OR.matcher(code).lookingAt() || GUARD_IF.matcher(code).lookingAt();
