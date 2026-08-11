@@ -9,7 +9,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,6 +16,11 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
 
     private static final String GUARD = "defined('XOOPS_ROOT_PATH') || exit('Restricted access');\n";
     private static final Pattern OPEN_TAG = Pattern.compile("<\\?(?:php|=)?", Pattern.CASE_INSENSITIVE);
+    /** Full normalized guard expression (not independent "defined" + "XOOPS_ROOT_PATH"). */
+    private static final Pattern ROOT_PATH_GUARD = Pattern.compile(
+            "defined\\s*\\(\\s*['\"]XOOPS_ROOT_PATH['\"]\\s*\\)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     @Override
     public @NotNull String getFamilyName() {
@@ -38,8 +42,7 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             return;
         }
         String text = document.getText();
-        if (text.toLowerCase(Locale.ROOT).contains("xoops_root_path")
-                && text.toLowerCase(Locale.ROOT).contains("defined")) {
+        if (ROOT_PATH_GUARD.matcher(text).find()) {
             return;
         }
         Matcher open = OPEN_TAG.matcher(text);

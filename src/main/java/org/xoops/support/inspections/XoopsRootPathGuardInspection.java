@@ -17,6 +17,10 @@ import java.util.regex.Pattern;
 public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
 
     private static final Pattern OPEN_TAG = Pattern.compile("<\\?(?:php|=)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ROOT_PATH_GUARD = Pattern.compile(
+            "defined\\s*\\(\\s*['\"]XOOPS_ROOT_PATH['\"]\\s*\\)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
@@ -43,7 +47,8 @@ public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
                 if (text == null || text.isBlank()) {
                     return;
                 }
-                if (text.contains("XOOPS_ROOT_PATH") && text.contains("defined")) {
+                // Require the full defined('XOOPS_ROOT_PATH') expression (not loose substrings).
+                if (ROOT_PATH_GUARD.matcher(text).find()) {
                     return;
                 }
                 if (!text.contains("<?php") && !text.contains("<?=") && !text.contains("<?")) {

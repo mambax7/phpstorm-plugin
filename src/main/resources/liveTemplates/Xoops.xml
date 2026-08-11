@@ -23,10 +23,10 @@
         </context>
     </template>
 
-    <!-- Local $db variable style -->
+    <!-- Local $db variable style: no return; only fetch when the result is valid -->
     <template name="xofetchdb"
-              value="$$result = $$db-&gt;query(&quot;$SQL$&quot;);&#10;if (!$$db-&gt;isResultSet($$result) || !($$result instanceof \mysqli_result)) {&#10;    return null;&#10;}&#10;$$row = $$db-&gt;fetchArray($$result);$END$"
-              description="query + isResultSet guard + fetchArray ($db)"
+              value="$$result = $$db-&gt;query(&quot;$SQL$&quot;);&#10;$$row = null;&#10;if ($$db-&gt;isResultSet($$result) &amp;&amp; $$result instanceof \mysqli_result) {&#10;    $$row = $$db-&gt;fetchArray($$result);&#10;}$END$"
+              description="query + isResultSet guard + fetchArray ($db), no early return"
               toReformat="true"
               toShortenFQNames="true">
         <variable name="SQL" expression="" defaultValue="&quot;SELECT 1&quot;" alwaysStopAt="true"/>
