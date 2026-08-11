@@ -41,7 +41,8 @@ CI runs the same command set.
 1. Update `pluginVersion` in `gradle.properties`.
 2. Update `<version>` and change-notes in `src/main/resources/META-INF/plugin.xml`.
 3. Update `CHANGELOG.md` and `whats-new.html`.
-4. Tag release: `git tag v1.0.0-alpha.2 && git push origin v1.0.0-alpha.2` (triggers release workflow).
+4. Tag release with the **same** version as `pluginVersion` in `gradle.properties`, e.g.  
+   `git tag v1.0.0-alpha.3 && git push origin v1.0.0-alpha.3` (triggers release workflow).
 
 ## Reporting issues
 

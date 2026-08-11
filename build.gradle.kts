@@ -43,7 +43,14 @@ intellijPlatform {
         version = prop("pluginVersion")
         ideaVersion {
             sinceBuild = prop("pluginSinceBuild")
-            untilBuild = prop("pluginUntilBuild")
+            // Open-ended when pluginUntilBuild is blank — required for PhpStorm 2026.2+ installs.
+            // https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html
+            val until = prop("pluginUntilBuild").trim()
+            if (until.isEmpty()) {
+                untilBuild = provider { null }
+            } else {
+                untilBuild = until
+            }
         }
     }
 

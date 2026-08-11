@@ -16,6 +16,7 @@ import java.awt.BorderLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.util.Objects;
 
 public final class XoopsConfigurable implements Configurable {
 
@@ -74,10 +75,13 @@ public final class XoopsConfigurable implements Configurable {
     @Override
     public boolean isModified() {
         XoopsSettingsState s = XoopsSettingsState.getInstance(project);
+        String selectedProfile = String.valueOf(profileBox.getSelectedItem());
+        String storedProfile = s.coreProfile == null ? "Auto" : s.coreProfile;
+        String storedPrefix = s.tablePrefix == null ? "" : s.tablePrefix;
         return enabledBox.isSelected() != s.enabled
                 || suppressNotifyBox.isSelected() != s.suppressStartupNotification
-                || !profileBox.getSelectedItem().equals(s.coreProfile)
-                || !prefixField.getText().trim().equals(s.tablePrefix == null ? "" : s.tablePrefix);
+                || !Objects.equals(selectedProfile, storedProfile)
+                || !Objects.equals(prefixField.getText().trim(), storedPrefix);
     }
 
     @Override

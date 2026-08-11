@@ -8,9 +8,9 @@ It brings XOOPS conventions into the IDE: inspections with Alt+Enter quick fixes
 | --- | --- |
 | Repository | [github.com/XOOPS/phpstorm-plugin](https://github.com/XOOPS/phpstorm-plugin) |
 | Plugin id | `org.xoops.plugin.support` |
-| Version | **1.0.0 Alpha 1** (`1.0.0-alpha.1`) |
-| Compatibility | PhpStorm **2024.3+** (builds `243`–`263.*`) |
-| License | [GPL-2.0](LICENSE) |
+| Version | **1.0.0 Alpha 3** (`1.0.0-alpha.3`) |
+| Compatibility | PhpStorm **2024.3+** (since-build `243`, no upper cap — includes **2026.2.x**) |
+| License | [GPL-2.0-or-later](LICENSE) |
 
 ## Features
 
@@ -81,10 +81,10 @@ xoops-support/
 Edit `gradle.properties` for version and platform target:
 
 ```properties
-pluginVersion=1.0.0-alpha.1
+pluginVersion=1.0.0-alpha.3
 platformVersion=2024.3.5
 pluginSinceBuild=243
-pluginUntilBuild=263.*
+pluginUntilBuild=          # empty = open-ended (2026.2+)
 ```
 
 ## Contributing
@@ -101,8 +101,10 @@ pluginUntilBuild=263.*
 - [Issues](https://github.com/XOOPS/phpstorm-plugin/issues)
 - [XOOPS](https://xoops.org)
 - [IntelliJ Platform Plugin SDK](https://plugins.jetbrains.com/docs/intellij/welcome.html)
-
+- Inspired by framework-focused IDE plugins such as [PHP Hammer](https://github.com/hammer-tools/php-hammer)
 
 ## License
 
-GNU General Public License v2.0 or later — see [LICENSE](LICENSE).
+**GPL-2.0-or-later** — see [LICENSE](LICENSE) (verbatim GNU GPL v2 text).
+
+Copyright (C) 2026 XOOPS Project and contributors.

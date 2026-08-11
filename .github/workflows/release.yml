@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -28,6 +30,17 @@ jobs:
 
       - name: Grant execute permissions
         run: chmod +x ./gradlew
+
+      - name: Validate tag matches pluginVersion
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          VER="$(grep -E '^pluginVersion=' gradle.properties | cut -d= -f2- | tr -d '[:space:]')"
+          echo "tag=$TAG pluginVersion=$VER"
+          if [ "$TAG" != "$VER" ]; then
+            echo "::error::Git tag v$TAG must match pluginVersion=$VER in gradle.properties"
+            exit 1
+          fi
 
       - name: Build plugin
         run: ./gradlew check verifyPlugin buildPlugin --stacktrace

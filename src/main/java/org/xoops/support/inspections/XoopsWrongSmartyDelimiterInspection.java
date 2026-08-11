@@ -24,7 +24,7 @@ public final class XoopsWrongSmartyDelimiterInspection extends LocalInspectionTo
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
-                String name = file.getName().toLowerCase();
+                String name = file.getName().toLowerCase(java.util.Locale.ROOT);
                 if (!name.endsWith(".tpl")) {
                     return;
                 }
@@ -50,7 +50,8 @@ public final class XoopsWrongSmartyDelimiterInspection extends LocalInspectionTo
                                         "Convert to XOOPS <{ }> delimiters",
                                         m.start(),
                                         m.end(),
-                                        fixed
+                                        fixed,
+                                        original
                                 )
                         );
                         count++;

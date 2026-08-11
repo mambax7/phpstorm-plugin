@@ -25,7 +25,7 @@ import java.net.URI;
 import java.nio.file.Path;
 
 /**
- * Background scan + clickable HTML findings (filesystem tool window design).
+ * Background scan + clickable HTML findings.
  */
 public final class XoopsToolWindowPanel extends JPanel {
 
@@ -59,12 +59,15 @@ public final class XoopsToolWindowPanel extends JPanel {
         String basePath = project.getBasePath();
         if (basePath == null || project.isDisposed()) {
             overview.setText("<html><body>No project path is available.</body></html>");
+            status.setText("No path");
+            refreshButton.setEnabled(true);
             return;
         }
         if (!XoopsSettingsState.getInstance(project).enabled) {
             overview.setText("<html><body><p>XOOPS Support is disabled for this project "
                     + "(Settings → XOOPS Support).</p></body></html>");
             status.setText("Disabled");
+            refreshButton.setEnabled(true);
             return;
         }
 
@@ -74,9 +77,18 @@ public final class XoopsToolWindowPanel extends JPanel {
         ProgressManager.getInstance().run(new Task.Backgroundable(project, "Scanning XOOPS project", false) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(basePath));
-                String html = new XoopsReportHtmlRenderer().render(report);
-                ToolWindowManager.getInstance(project).invokeLater(() -> applyReport(report, html));
+                try {
+                    XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(basePath));
+                    String html = new XoopsReportHtmlRenderer().render(report);
+                    ToolWindowManager.getInstance(project).invokeLater(() -> applyReport(report, html));
+                } catch (Throwable t) {
+                    String msg = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+                    String html = "<html><body style='font-family:sans-serif;padding:8px'>"
+                            + "<p><b>Scan failed</b></p><p>"
+                            + escape(msg)
+                            + "</p></body></html>";
+                    ToolWindowManager.getInstance(project).invokeLater(() -> applyError(html));
+                }
             }
         });
     }
@@ -89,6 +101,20 @@ public final class XoopsToolWindowPanel extends JPanel {
         overview.setCaretPosition(0);
         status.setText(report.modules().size() + " modules, " + report.findings().size() + " findings");
         refreshButton.setEnabled(true);
+    }
+
+    private void applyError(String html) {
+        if (project.isDisposed()) {
+            return;
+        }
+        overview.setText(html);
+        overview.setCaretPosition(0);
+        status.setText("Scan failed");
+        refreshButton.setEnabled(true);
+    }
+
+    private static String escape(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private void openFinding(HyperlinkEvent event) {

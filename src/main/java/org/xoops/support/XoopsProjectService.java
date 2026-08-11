@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -57,7 +58,7 @@ public final class XoopsProjectService {
         );
         for (VirtualFile file : files) {
             // Prefer site root mainfile over copies under docs/vendor.
-            String path = file.getPath().replace('\\', '/').toLowerCase();
+            String path = file.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
             if (path.contains("/vendor/") || path.contains("/docs/") || path.contains("/node_modules/")) {
                 continue;
             }
@@ -82,7 +83,7 @@ public final class XoopsProjectService {
         );
         List<VirtualFile> out = new ArrayList<>();
         for (VirtualFile file : files) {
-            String path = file.getPath().replace('\\', '/').toLowerCase();
+            String path = file.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
             if (path.contains("/vendor/") || path.contains("/docs/phpstormplugins/")) {
                 continue;
             }

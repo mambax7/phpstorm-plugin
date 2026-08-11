@@ -46,11 +46,14 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
                     if (leaf == null) {
                         continue;
                     }
+                    String expectedName = text.substring(nameStart, nameEnd);
                     if (method.equalsIgnoreCase("quoteString")) {
                         holder.registerProblem(
                                 leaf,
                                 "XOOPS: quoteString() is deprecated - use quote()",
-                                new ReplaceRangeQuickFix("Replace quoteString() with quote()", nameStart, nameEnd, "quote")
+                                new ReplaceRangeQuickFix(
+                                        "Replace quoteString() with quote()",
+                                        nameStart, nameEnd, "quote", expectedName)
                         );
                         continue;
                     }
@@ -71,9 +74,9 @@ public final class XoopsDeprecatedDbApiInspection extends LocalInspectionTool {
                         }
                     }
                     LocalQuickFix toQuery = new ReplaceRangeQuickFix(
-                            "Replace queryF() with query()", nameStart, nameEnd, "query");
+                            "Replace queryF() with query()", nameStart, nameEnd, "query", expectedName);
                     LocalQuickFix toExec = new ReplaceRangeQuickFix(
-                            "Replace queryF() with exec()", nameStart, nameEnd, "exec");
+                            "Replace queryF() with exec()", nameStart, nameEnd, "exec", expectedName);
                     if (knownMutation) {
                         holder.registerProblem(leaf, message, toExec, toQuery);
                     } else if (knownSelect) {

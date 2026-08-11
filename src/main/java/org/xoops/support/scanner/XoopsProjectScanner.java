@@ -147,24 +147,45 @@ public final class XoopsProjectScanner {
     }
 
     private static CoreProfile detectProfile(Path projectRoot, Path webRoot) {
-        StringBuilder evidence = new StringBuilder();
+        // Prefer core include/version.php — composer.json dependency ranges often mislead (e.g. "2.5").
         for (Path candidate : List.of(
                 webRoot.resolve("include/version.php"),
-                webRoot.resolve("include/common.php"),
-                projectRoot.resolve("composer.json"),
-                webRoot.resolve("composer.json")
+                webRoot.resolve("include/common.php")
         )) {
-            readSmallFile(candidate).ifPresent(evidence::append);
+            Optional<String> body = readSmallFile(candidate);
+            if (body.isEmpty()) {
+                continue;
+            }
+            String text = body.get();
+            if (VERSION_40.matcher(text).find()) {
+                return CoreProfile.XOOPS_40;
+            }
+            if (VERSION_27.matcher(text).find()) {
+                return CoreProfile.XOOPS_27;
+            }
+            if (VERSION_25.matcher(text).find()) {
+                return CoreProfile.XOOPS_25;
+            }
         }
-        String text = evidence.toString();
-        if (VERSION_40.matcher(text).find()) {
-            return CoreProfile.XOOPS_40;
-        }
-        if (VERSION_27.matcher(text).find()) {
-            return CoreProfile.XOOPS_27;
-        }
-        if (VERSION_25.matcher(text).find()) {
-            return CoreProfile.XOOPS_25;
+        // Fallback: only look for XOOPS package names in root composer, not arbitrary deps.
+        for (Path candidate : List.of(webRoot.resolve("composer.json"), projectRoot.resolve("composer.json"))) {
+            Optional<String> body = readSmallFile(candidate);
+            if (body.isEmpty()) {
+                continue;
+            }
+            String text = body.get();
+            if (!text.toLowerCase(Locale.ROOT).contains("xoops")) {
+                continue;
+            }
+            if (VERSION_40.matcher(text).find()) {
+                return CoreProfile.XOOPS_40;
+            }
+            if (VERSION_27.matcher(text).find()) {
+                return CoreProfile.XOOPS_27;
+            }
+            if (VERSION_25.matcher(text).find()) {
+                return CoreProfile.XOOPS_25;
+            }
         }
         return CoreProfile.UNKNOWN;
     }
@@ -206,8 +227,7 @@ public final class XoopsProjectScanner {
         }
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
         if (name.endsWith(".php")) {
-            // Cap findings per file so large modules stay usable.
-            int before = findings.size();
+            // One finding per kind per file (addFirst) — keeps large modules usable.
             addFirst(findings, content, path, RAW_REQUEST, "RAW_REQUEST",
                     "Avoid $_REQUEST; use a scoped Xmf\\Request API.");
             addFirst(findings, content, path, QUERY_F, "DEPRECATED_QUERY_F",
@@ -216,9 +236,6 @@ public final class XoopsProjectScanner {
                     "quoteString() is deprecated; use quote().");
             addFirst(findings, content, path, MUTATING_QUERY, "MUTATING_QUERY",
                     "Mutating SQL must use exec(), not query().");
-            if (findings.size() - before > 20) {
-                // already capped by addFirst (one each)
-            }
         } else if (name.endsWith(".tpl")) {
             addFirst(findings, content, path, WRONG_SMARTY, "WRONG_SMARTY_DELIMITER",
                     "XOOPS Smarty templates use <{ and }> delimiters.");

@@ -13,12 +13,12 @@ This folder is a standalone tree for **XOOPS Support** (PhpStorm plugin), simila
 ## 2. Initialize and push (from this directory)
 
 ```bash
-cd docs/phpStormPlugins/xoops-support   # or your checkout of this tree
+# Run from the root of your clone of XOOPS/phpstorm-plugin
 
 git init
 git branch -M main
 git add .
-git commit -m "Initial release of XOOPS Support 1.0.0 Alpha 1"
+git commit -m "XOOPS Support 1.0.0 Alpha 3 — PR review fixes"
 git remote add origin https://github.com/XOOPS/phpstorm-plugin.git
 # or: git remote add origin git@github.com:XOOPS/phpstorm-plugin.git
 git push -u origin main
@@ -45,9 +45,11 @@ First CI run downloads the PhpStorm SDK and Plugin Verifier — allow 10–20+ m
 Alpha tag:
 
 ```bash
-git tag v1.0.0-alpha.1
-git push origin v1.0.0-alpha.1
+git tag v1.0.0-alpha.3
+git push origin v1.0.0-alpha.3
 ```
+
+Tag **must** match `pluginVersion` in `gradle.properties` (release workflow enforces this).
 
 **`.github/workflows/release.yml`** builds the plugin and attaches `build/distributions/*.zip` to a [GitHub Release](https://github.com/XOOPS/phpstorm-plugin/releases).
 
@@ -57,7 +59,15 @@ For JetBrains Marketplace:
 
 1. Create a publisher account and obtain `PUBLISH_TOKEN`.
 2. Add signing secrets if required (`CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`).
-3. Extend `build.gradle.kts` with `publishPlugin { token = … }` (see IntelliJ Platform docs).
+3. Configure publishing in `build.gradle.kts`:
+
+```kotlin
+intellijPlatform {
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+    }
+}
+```
 
 Not wired by default.
 
@@ -69,7 +79,7 @@ Not wired by default.
 | `.github/workflows/release.yml` | Tag → GitHub Release |
 | `src/` | Plugin sources |
 | `gradlew` / `gradlew.bat` | Wrapper |
-| `LICENSE` | GPL-2.0 |
+| `LICENSE` | GPL-2.0 (verbatim; project is GPL-2.0-or-later) |
 | `README.md` | Project home |
 | `CONTRIBUTING.md` | Dev guide |
 | `gradle.properties` | Version & platform |

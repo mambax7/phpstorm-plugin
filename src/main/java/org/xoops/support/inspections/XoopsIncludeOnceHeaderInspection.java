@@ -38,6 +38,7 @@ public final class XoopsIncludeOnceHeaderInspection extends LocalInspectionTool 
                     if (leaf == null) {
                         continue;
                     }
+                    String expected = text.substring(kwStart, kwEnd);
                     holder.registerProblem(
                             leaf,
                             "XOOPS: use include_once for header.php / footer.php",
@@ -45,7 +46,8 @@ public final class XoopsIncludeOnceHeaderInspection extends LocalInspectionTool 
                                     "Replace include with include_once",
                                     kwStart,
                                     kwEnd,
-                                    "include_once"
+                                    "include_once",
+                                    expected
                             )
                     );
                 }

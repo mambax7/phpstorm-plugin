@@ -48,10 +48,12 @@ public final class XoopsQueryExecInspection extends LocalInspectionTool {
                         if (leaf == null) {
                             continue;
                         }
+                        String expected = text.substring(nameStart, nameEnd);
                         holder.registerProblem(
                                 leaf,
                                 "XOOPS: mutating SQL must use exec(), not query()",
-                                new ReplaceRangeQuickFix("Replace query() with exec()", nameStart, nameEnd, "exec")
+                                new ReplaceRangeQuickFix(
+                                        "Replace query() with exec()", nameStart, nameEnd, "exec", expected)
                         );
                     }
                 }

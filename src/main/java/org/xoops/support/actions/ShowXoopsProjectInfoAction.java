@@ -3,6 +3,9 @@ package org.xoops.support.actions;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
@@ -21,7 +24,33 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
         if (project == null || project.getBasePath() == null) {
             return;
         }
-        XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(project.getBasePath()));
+        String basePath = project.getBasePath();
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Scanning XOOPS project", false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                XoopsProjectReport report;
+                try {
+                    report = new XoopsProjectScanner().scan(Path.of(basePath));
+                } catch (Exception ex) {
+                    String msg = "Scan failed: " + ex.getMessage();
+                    com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
+                            () -> Messages.showErrorDialog(project, msg, "XOOPS Support - Project Info")
+                    );
+                    return;
+                }
+                String message = formatReport(report);
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
+                        () -> {
+                            if (!project.isDisposed()) {
+                                Messages.showInfoMessage(project, message, "XOOPS Support - Project Info");
+                            }
+                        }
+                );
+            }
+        });
+    }
+
+    private static @NotNull String formatReport(XoopsProjectReport report) {
         StringBuilder sb = new StringBuilder();
         if (!report.xoopsProject()) {
             sb.append("No XOOPS markers found (mainfile.php / xoops_version.php).");
@@ -44,7 +73,7 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
             sb.append("Sample findings: ").append(report.findings().size())
                     .append(" (see tool window for details)");
         }
-        Messages.showInfoMessage(project, sb.toString(), "XOOPS Support - Project Info");
+        return sb.toString();
     }
 
     @Override

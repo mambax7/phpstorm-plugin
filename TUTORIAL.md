@@ -19,9 +19,9 @@ Then **Install Plugin from Disk…** → `build/distributions/xoops-support-*.zi
 
 ## 2. Project detection
 
-1. Open a XOOPS tree (this repo works).
+1. Open a **real XOOPS install** (with `mainfile.php` or `htdocs/mainfile.php`). This plugin repository alone is not a XOOPS site root.
 2. Optional balloon: “XOOPS Support active”.
-3. **Tools → XOOPS Support → Show XOOPS Project Info**.
+3. **Tools → XOOPS Support → Show XOOPS Project Info** (runs in the background).
 4. **Settings** (search “XOOPS Support”): enable/disable, profile, suppress notification.
 
 ## 3. Tool window / scanner
@@ -74,9 +74,15 @@ Type `_MI_` (or `_AM_`, `_MD_`, …) and **Ctrl+Space** — completions from `la
 ## 9. Development (sandbox)
 
 ```powershell
-gradle runIde
+.\gradlew.bat runIde
 # other terminal after edits:
-gradle buildPlugin --continuous
+.\gradlew.bat buildPlugin --continuous
+```
+
+```bash
+./gradlew runIde
+# other terminal:
+./gradlew buildPlugin --continuous
 ```
 
 Focus sandbox to hot-reload (not under debugger).

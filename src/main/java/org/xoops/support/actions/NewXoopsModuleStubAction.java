@@ -29,7 +29,7 @@ public final class NewXoopsModuleStubAction extends AnAction implements DumbAwar
         }
         String dirname = Messages.showInputDialog(
                 project,
-                "Module dirname (letters, numbers, underscore):",
+                "Module dirname (1–32 chars: start with a letter, then letters, digits, or underscore):",
                 "New XOOPS Module Stub",
                 Messages.getQuestionIcon(),
                 "mymodule",
@@ -39,8 +39,13 @@ public final class NewXoopsModuleStubAction extends AnAction implements DumbAwar
             return;
         }
         dirname = dirname.trim().toLowerCase(Locale.ROOT);
-        if (!dirname.matches("[a-z][a-z0-9_]{1,32}")) {
-            Messages.showErrorDialog(project, "Invalid dirname.", "New XOOPS Module Stub");
+        // 1–32 chars: leading letter, then [a-z0-9_]
+        if (!dirname.matches("[a-z][a-z0-9_]{0,31}")) {
+            Messages.showErrorDialog(
+                    project,
+                    "Invalid dirname. Use 1–32 characters: start with a letter, then letters, digits, or underscore.",
+                    "New XOOPS Module Stub"
+            );
             return;
         }
 
@@ -165,10 +170,9 @@ public final class NewXoopsModuleStubAction extends AnAction implements DumbAwar
     }
 
     private static String indexPhp(String dirname) {
+        // Entry points must NOT guard before mainfile.php — XOOPS_ROOT_PATH is defined there.
         return """
                 <?php
-                
-                defined('XOOPS_ROOT_PATH') || exit('Restricted access');
                 
                 include_once __DIR__ . '/../../mainfile.php';
                 $GLOBALS['xoopsOption']['template_main'] = '%s_index.tpl';
@@ -239,7 +243,7 @@ public final class NewXoopsModuleStubAction extends AnAction implements DumbAwar
         return """
                 # %s module guidelines
                 
-                - Guard entry points with `defined('XOOPS_ROOT_PATH') || exit('Restricted access');`
+                - Guard included files with `defined('XOOPS_ROOT_PATH') || exit('Restricted access');` (not public entry points that load mainfile.php first)
                 - Prefer `\\Xmf\\Request` over superglobals
                 - Use `exec()` for mutating SQL; guard fetches with `isResultSet`
                 - Templates use XOOPS Smarty delimiters `<{ }>` and `|escape` on output

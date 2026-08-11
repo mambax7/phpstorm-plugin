@@ -31,31 +31,34 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                 String text = file.getText();
                 Matcher m = FETCH.matcher(text);
                 while (m.find()) {
+                    String dbExpr = m.group(1).replaceAll("\\s+", "");
+                    String resultVar = m.group(3);
                     int start = Math.max(0, m.start() - 400);
-                    String window = text.substring(start, m.start());
-                    if (window.contains("isResultSet")) {
+                    String window = text.substring(start, m.start()).replaceAll("\\s+", "");
+                    // Only suppress when this result variable is already guarded nearby.
+                    if (window.contains("isResultSet(" + resultVar + ")")) {
                         continue;
                     }
                     PsiElement leaf = PhpTextUtil.leafAt(file, m.start());
                     if (leaf == null) {
                         continue;
                     }
-                    String dbExpr = m.group(1).replaceAll("\\s+", "");
-                    String resultVar = m.group(3);
-                    // Indent is estimated at apply time; use spaces matching common style.
                     String indentGuess = guessIndent(text, m.start());
+                    // Scope-neutral body: "return null" is unsafe in constructors / void methods.
                     String block = indentGuess + "if (!" + dbExpr + "->isResultSet(" + resultVar
                             + ") || !" + resultVar + " instanceof \\mysqli_result) {\n"
-                            + indentGuess + "    return null;\n"
+                            + indentGuess + "    // TODO: handle failed query (return, continue, or throw)\n"
                             + indentGuess + "}\n";
                     int insertAt = lineStart(text, m.start());
+                    String expectedAt = text.substring(insertAt, Math.min(text.length(), insertAt + 32));
                     holder.registerProblem(
                             leaf,
                             "XOOPS: call isResultSet($result) (and prefer mysqli_result check) before fetch*",
                             new InsertBeforeOffsetQuickFix(
                                     "Insert isResultSet guard before fetch",
                                     insertAt,
-                                    block
+                                    block,
+                                    expectedAt
                             )
                     );
                 }

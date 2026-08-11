@@ -2,14 +2,21 @@ package org.xoops.support.inspections;
 
 import com.intellij.codeInspection.LocalInspectionTool;
 import com.intellij.codeInspection.ProblemsHolder;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Flags module/class PHP files that lack the classic direct-access guard.
  */
 public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
+
+    private static final Pattern OPEN_TAG = Pattern.compile("<\\?(?:php|=)?", Pattern.CASE_INSENSITIVE);
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
@@ -19,14 +26,12 @@ public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {
                     return;
                 }
-                // Language packs and pure define files often skip the guard.
                 if (PhpTextUtil.looksLikeLanguageFile(file)) {
                     return;
                 }
                 String path = file.getVirtualFile() != null
-                        ? file.getVirtualFile().getPath().replace('\\', '/').toLowerCase()
+                        ? file.getVirtualFile().getPath().replace('\\', '/').toLowerCase(Locale.ROOT)
                         : "";
-                // Focus on module/class trees; skip tests bootstrap noise lightly.
                 boolean inModuleOrClass = path.contains("/modules/")
                         || path.contains("/class/")
                         || path.contains("/preloads/")
@@ -38,16 +43,22 @@ public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
                 if (text == null || text.isBlank()) {
                     return;
                 }
-                // Already has a guard.
                 if (text.contains("XOOPS_ROOT_PATH") && text.contains("defined")) {
                     return;
                 }
-                // Skip empty stubs / pure interfaces without side effects (heuristic).
-                if (!text.contains("<?php") && !text.contains("<?=")) {
+                if (!text.contains("<?php") && !text.contains("<?=") && !text.contains("<?")) {
                     return;
                 }
+                PsiElement anchor = file;
+                Matcher open = OPEN_TAG.matcher(text);
+                if (open.find()) {
+                    PsiElement leaf = PhpTextUtil.leafAt(file, open.start());
+                    if (leaf != null) {
+                        anchor = leaf;
+                    }
+                }
                 holder.registerProblem(
-                        file,
+                        anchor,
                         "XOOPS: missing direct-access guard - add "
                                 + "defined('XOOPS_ROOT_PATH') || exit('Restricted access'); "
                                 + "(Alt+Enter or live template: xoguard)",
