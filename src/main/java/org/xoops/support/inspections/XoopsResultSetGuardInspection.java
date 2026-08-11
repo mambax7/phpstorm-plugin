@@ -11,13 +11,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Flags fetchArray/fetchRow/fetchBoth calls without a nearby isResultSet check
- * that would prevent the fetch from running on a failed query.
+ * Flags fetchArray/fetchRow/fetchBoth calls that are not protected by an
+ * immediately preceding early-exit {@code isResultSet($result)} guard, or by
+ * being nested inside a positive {@code if (isResultSet($result))} block.
  *
- * <p>Note: full PHP CFG dominance is not available without a deep PhpStorm PSI
- * analysis pass. Suppression uses a comment-stripped preceding window and a
- * variable-bound {@code isResultSet($result)} match. Failure branches use
- * {@code throw}, which is valid in methods, constructors, loops, and file scope.
+ * <p>Failure quick-fix always uses {@code throw} (valid in every PHP scope).
+ * We intentionally never emit {@code continue}, which is only legal inside loops
+ * and cannot be proven from loose text heuristics.
  */
 public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
 
@@ -29,6 +29,8 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
     private static final Pattern LINE_COMMENT = Pattern.compile("//[^\\n]*");
     private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
     private static final Pattern HASH_COMMENT = Pattern.compile("#[^\\n]*");
+
+    private static final String FAIL_ACTION = "throw new \\RuntimeException('Database query failed');";
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
@@ -43,10 +45,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                 while (m.find()) {
                     String dbExpr = m.group(1).replaceAll("\\s+", "");
                     String resultVar = m.group(3);
-                    int start = Math.max(0, m.start() - 600);
-                    String window = stripPhpComments(text.substring(start, m.start()));
-                    // Variable-bound guard only (ignore unrelated isResultSet / comments).
-                    if (hasDominatingIsResultSetGuard(window, resultVar)) {
+                    // Only the code immediately before the fetch (comment-stripped).
+                    String before = stripPhpComments(text.substring(0, m.start()));
+                    if (isFetchAlreadyGuarded(before, resultVar)) {
                         continue;
                     }
                     PsiElement leaf = PhpTextUtil.leafAt(file, m.start());
@@ -54,12 +55,10 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                         continue;
                     }
                     String indentGuess = guessIndent(text, m.start());
-                    // throw is valid in constructors, void methods, loops, and file scope,
-                    // and prevents fetch* from executing on a failed query.
-                    String failAction = failureAction(text, m.start(), indentGuess);
+                    // Always throw: never continue (would be invalid outside a loop).
                     String block = indentGuess + "if (!" + dbExpr + "->isResultSet(" + resultVar
                             + ") || !" + resultVar + " instanceof \\mysqli_result) {\n"
-                            + indentGuess + "    " + failAction + "\n"
+                            + indentGuess + "    " + FAIL_ACTION + "\n"
                             + indentGuess + "}\n";
                     int insertAt = lineStart(text, m.start());
                     String expectedAt = text.substring(insertAt, Math.min(text.length(), insertAt + 32));
@@ -79,52 +78,85 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
     }
 
     /**
-     * True when a prior non-comment isResultSet($resultVar) appears to guard the fetch.
-     * Lightweight approximation of “dominates fetch” without full PHP CFG.
+     * Suppress only when the fetch is actually protected:
+     * <ul>
+     *   <li>An early-exit {@code if (!isResultSet($var)...) { return|throw|... }} ends
+     *       immediately before the fetch (only whitespace/semicolons between), or</li>
+     *   <li>The fetch sits inside a still-open positive
+     *       {@code if (isResultSet($var)...)} block (brace depth ≥ 1).</li>
+     * </ul>
+     * A bare {@code isResultSet} earlier in the function (sibling branch) does not suppress.
      */
-    private static boolean hasDominatingIsResultSetGuard(@NotNull String window, @NotNull String resultVar) {
-        String escapedVar = Pattern.quote(resultVar);
-        Pattern pos = Pattern.compile(
-                "isResultSet\\s*\\(\\s*" + escapedVar + "\\s*\\)",
-                Pattern.CASE_INSENSITIVE
+    private static boolean isFetchAlreadyGuarded(@NotNull String before, @NotNull String resultVar) {
+        String escaped = Pattern.quote(resultVar);
+
+        // 1) Early-exit guard immediately preceding the fetch.
+        Pattern earlyExit = Pattern.compile(
+                "(?is)if\\s*\\([^;{]*!\\s*[^;{]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^;{]*\\)"
+                        + "\\s*\\{[^}]*\\b(return|throw|exit|die|break|continue)\\b[^}]*\\}\\s*$"
         );
-        Pattern neg = Pattern.compile(
-                "!\\s*[\\w$\\->\\s]*isResultSet\\s*\\(\\s*" + escapedVar + "\\s*\\)"
-                        + "|!\\s*" + escapedVar + "\\s*instanceof",
-                Pattern.CASE_INSENSITIVE
+        if (earlyExit.matcher(before).find()) {
+            return true;
+        }
+
+        // Compact single-statement early exit: if (!isResultSet($r)) return;
+        Pattern earlyExitOneLiner = Pattern.compile(
+                "(?is)if\\s*\\([^;{]*!\\s*[^;{]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^;{]*\\)"
+                        + "\\s*:\\s*\\b(return|throw|exit|die)\\b[^;]*;\\s*$"
+                        + "|if\\s*\\([^;{]*!\\s*[^;{]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^;{]*\\)"
+                        + "\\s*\\b(return|throw|exit|die)\\b[^;]*;\\s*$"
         );
-        // Either positive check wrapping the fetch later, or negative early-exit pattern.
-        return pos.matcher(window).find() || neg.matcher(window).find();
+        if (earlyExitOneLiner.matcher(before).find()) {
+            return true;
+        }
+
+        // 2) Nested inside a positive if (isResultSet($var)) { ... fetch ... }
+        return isInsidePositiveIsResultSetBlock(before, resultVar);
     }
 
     /**
-     * Prefer {@code continue} inside obvious loop bodies; otherwise {@code throw}
-     * (safe in constructors / void methods / file scope).
+     * Walk from the last {@code if (...isResultSet($var)...)} forward with brace depth.
+     * If depth stays &gt; 0 through the end of {@code before}, the fetch is still inside that block.
      */
-    private static @NotNull String failureAction(@NotNull String text, int offset, @NotNull String indent) {
-        String before = stripPhpComments(text.substring(Math.max(0, offset - 800), offset));
-        // Heuristic: last loop keyword after last function/method opening is still “open”.
-        int lastFor = Math.max(
-                Math.max(before.lastIndexOf("foreach"), before.lastIndexOf("for (")),
-                Math.max(before.lastIndexOf("while ("), before.lastIndexOf("do {"))
+    private static boolean isInsidePositiveIsResultSetBlock(@NotNull String before, @NotNull String resultVar) {
+        String escaped = Pattern.quote(resultVar);
+        Pattern openIf = Pattern.compile(
+                "(?is)if\\s*\\(([^)]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^)]*)\\)\\s*\\{"
         );
-        int lastFunction = Math.max(
-                Math.max(before.lastIndexOf("function "), before.lastIndexOf("function(")),
-                before.lastIndexOf("function\t")
-        );
-        if (lastFor > lastFunction && lastFor >= 0) {
-            // Inside a loop-like region relative to the enclosing function start.
-            return "continue;";
+        Matcher m = openIf.matcher(before);
+        int lastOpenEnd = -1;
+        while (m.find()) {
+            String cond = m.group(1);
+            // Skip negated guards (those are early-exit style, handled above).
+            if (cond.replaceAll("\\s+", "").contains("!")) {
+                // Could be !isResultSet or !$x instanceof — not a positive wrap.
+                if (cond.matches("(?is).*!\\s*[\\w$\\->\\s]*isResultSet.*")
+                        || cond.matches("(?is).*!\\s*" + escaped + "\\s*instanceof.*")) {
+                    continue;
+                }
+            }
+            lastOpenEnd = m.end();
         }
-        if (before.contains("__construct") && before.lastIndexOf("__construct") > lastFunction - 20) {
-            // Constructor: bare return; is fine; throw is clearer for failed DB work.
-            return "throw new \\RuntimeException('Database query failed');";
+        if (lastOpenEnd < 0) {
+            return false;
         }
-        // Default: throw aborts before fetch in every scope without inventing a return type.
-        return "throw new \\RuntimeException('Database query failed');";
+        // Brace depth from the opening '{' of that if (already consumed by the match end).
+        int depth = 1;
+        for (int i = lastOpenEnd; i < before.length(); i++) {
+            char c = before.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    // Block closed before the fetch → sibling region, not dominating.
+                    return false;
+                }
+            }
+        }
+        return depth > 0;
     }
 
-    /** Remove //, #, and /* *\/ comments so comment text cannot suppress findings. */
     private static @NotNull String stripPhpComments(@NotNull String text) {
         String s = BLOCK_COMMENT.matcher(text).replaceAll(" ");
         s = LINE_COMMENT.matcher(s).replaceAll(" ");
