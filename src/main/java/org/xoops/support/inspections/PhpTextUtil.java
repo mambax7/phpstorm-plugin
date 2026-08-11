@@ -115,10 +115,17 @@ final class PhpTextUtil {
                         i++;
                     }
                     String line = text.substring(lineStart, i);
-                    String trimmed = line.stripTrailing();
-                    // optional leading whitespace then IDENT optional ;
-                    String body = trimmed.stripLeading();
-                    boolean closer = body.equals(ident) || body.equals(ident + ";");
+                    String body = line.stripTrailing().stripLeading();
+                    // Closer: IDENT at start of line; following token may be ; ) , etc., but not more word chars.
+                    boolean closer = false;
+                    if (body.startsWith(ident)) {
+                        if (body.length() == ident.length()) {
+                            closer = true;
+                        } else {
+                            char next = body.charAt(ident.length());
+                            closer = !Character.isLetterOrDigit(next) && next != '_';
+                        }
+                    }
                     for (int k = lineStart; k < i; k++) {
                         chars[k] = ' ';
                     }

@@ -21,8 +21,11 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
     private static final String GUARD = "defined('XOOPS_ROOT_PATH') || exit('Restricted access');\n";
     private static final Pattern OPEN_PHP = Pattern.compile("<\\?php\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern OPEN_ECHO = Pattern.compile("<\\?=", Pattern.CASE_INSENSITIVE);
-    /** Short open tag: {@code <?} not followed by php or = */
-    private static final Pattern OPEN_SHORT = Pattern.compile("<\\?(?!php|=)", Pattern.CASE_INSENSITIVE);
+    /** Short open tag: {@code <?} not followed by php, =, or xml (avoid XML prologs). */
+    private static final Pattern OPEN_SHORT = Pattern.compile(
+            "<\\?(?!php|=|xml\\b)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     @Override
     public @NotNull String getFamilyName() {
