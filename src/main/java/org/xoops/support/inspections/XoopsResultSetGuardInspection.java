@@ -8,17 +8,22 @@ import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
 import org.xoops.support.XoopsSupportPlugin;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Flags fetchArray/fetchRow/fetchBoth calls that are not protected by an
  * immediately preceding early-exit {@code isResultSet($result)} guard, or by
- * being nested inside a positive {@code if (isResultSet($result))} block.
+ * being nested inside a positive {@code if (... isResultSet($result) ...)} block
+ * (including compound conditions with parenthesized operands such as
+ * {@code count($errors) === 0 && $db->isResultSet($result)}).
+ *
+ * <p>If-conditions are parsed with balanced parentheses (not {@code [^)]*}), so
+ * nested calls in the condition do not truncate the match.
  *
  * <p>Failure quick-fix always uses {@code throw} (valid in every PHP scope).
- * We intentionally never emit {@code continue}, which is only legal inside loops
- * and cannot be proven from loose text heuristics.
  */
 public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
 
@@ -26,6 +31,8 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             "(\\$[A-Za-z_][\\w]*(?:\\s*->\\s*\\$?[A-Za-z_][\\w]*)*)\\s*->\\s*fetch(Array|Row|Both)\\s*\\(\\s*(\\$[A-Za-z_][\\w]*)",
             Pattern.CASE_INSENSITIVE
     );
+
+    private static final Pattern IF_KEYWORD = Pattern.compile("\\bif\\s*\\(", Pattern.CASE_INSENSITIVE);
 
     private static final String FAIL_ACTION = "throw new \\RuntimeException('Database query failed');";
 
@@ -41,11 +48,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     return;
                 }
                 String text = file.getText();
-                // Match fetches outside comments/strings; offsets align with original text.
                 String code = PhpTextUtil.maskCommentsAndStrings(text);
                 Matcher m = FETCH.matcher(code);
                 while (m.find()) {
-                    // Recover identifiers from original source (masked region is spaces for strings only).
                     String dbExpr = text.substring(m.start(1), m.end(1)).replaceAll("\\s+", "");
                     String resultVar = text.substring(m.start(3), m.end(3));
                     String before = code.substring(0, m.start());
@@ -57,7 +62,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                         continue;
                     }
                     String indentGuess = guessIndent(text, m.start());
-                    // Always throw: never continue (would be invalid outside a loop).
                     String block = indentGuess + "if (!" + dbExpr + "->isResultSet(" + resultVar
                             + ") || !" + resultVar + " instanceof \\mysqli_result) {\n"
                             + indentGuess + "    " + FAIL_ACTION + "\n"
@@ -79,45 +83,146 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         };
     }
 
-    /**
-     * Suppress only when the fetch is actually protected:
-     * <ul>
-     *   <li>An early-exit {@code if (!isResultSet($var)...) { return|throw|... }} ends
-     *       immediately before the fetch (only whitespace/semicolons between), or</li>
-     *   <li>The fetch sits inside a still-open positive
-     *       {@code if (isResultSet($var)...)} block (brace depth ≥ 1).</li>
-     * </ul>
-     * A bare {@code isResultSet} earlier in the function (sibling branch) does not suppress.
-     */
     private static boolean isFetchAlreadyGuarded(@NotNull String before, @NotNull String resultVar) {
+        List<IfCond> ifs = findIfConditions(before);
+        if (ifs.isEmpty()) {
+            return false;
+        }
+
+        // 1) Early-exit: last if ends at EOF of `before` and negates isResultSet with return/throw body.
+        IfCond last = ifs.get(ifs.size() - 1);
+        if (isOnlyWhitespace(before.substring(Math.min(last.ifEnd, before.length())))) {
+            // if construct consumed through end of before (still “attached” to the fetch)
+            if (conditionNegatesIsResultSet(last.condition, resultVar)
+                    && bodyHasEarlyExit(before, last)) {
+                return true;
+            }
+        } else if (last.ifEnd >= before.length()
+                && conditionNegatesIsResultSet(last.condition, resultVar)
+                && bodyHasEarlyExit(before, last)) {
+            return true;
+        }
+
+        // Also: early-exit if ends with only whitespace after ifEnd
+        if (last.ifEnd <= before.length()
+                && isOnlyWhitespace(before.substring(last.ifEnd))
+                && conditionNegatesIsResultSet(last.condition, resultVar)
+                && bodyHasEarlyExit(before, last)) {
+            return true;
+        }
+
+        // 2) Nested inside a still-open positive if (... isResultSet($var) ...)
+        return isInsidePositiveIsResultSetBlock(before, resultVar, ifs);
+    }
+
+    /**
+     * Find every {@code if ( ... )} with a fully balanced condition so nested
+     * parentheses (e.g. {@code count($errors) === 0 && isResultSet($r)}) work.
+     */
+    private static @NotNull List<IfCond> findIfConditions(@NotNull String text) {
+        List<IfCond> out = new ArrayList<>();
+        Matcher m = IF_KEYWORD.matcher(text);
+        while (m.find()) {
+            int openParen = m.end() - 1;
+            int closeParen = matchingCloseParen(text, openParen);
+            if (closeParen < 0) {
+                continue;
+            }
+            String cond = text.substring(openParen + 1, closeParen);
+            int after = closeParen + 1;
+            while (after < text.length() && Character.isWhitespace(text.charAt(after))) {
+                after++;
+            }
+            int bodyStart = -1;
+            int openBrace = -1;
+            int ifEnd;
+            if (after < text.length() && text.charAt(after) == '{') {
+                openBrace = after;
+                bodyStart = after + 1;
+                int closeBrace = matchingCloseBrace(text, after);
+                ifEnd = closeBrace < 0 ? text.length() : closeBrace + 1;
+            } else {
+                int semi = text.indexOf(';', after);
+                ifEnd = semi < 0 ? text.length() : semi + 1;
+            }
+            out.add(new IfCond(m.start(), openParen, closeParen, openBrace, bodyStart, ifEnd, cond));
+        }
+        return out;
+    }
+
+    private static int matchingCloseParen(@NotNull String text, int openParen) {
+        if (openParen < 0 || openParen >= text.length() || text.charAt(openParen) != '(') {
+            return -1;
+        }
+        int depth = 1;
+        for (int i = openParen + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static int matchingCloseBrace(@NotNull String text, int openBrace) {
+        if (openBrace < 0 || openBrace >= text.length() || text.charAt(openBrace) != '{') {
+            return -1;
+        }
+        int depth = 1;
+        for (int i = openBrace + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isOnlyWhitespace(@NotNull String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isWhitespace(s.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean bodyHasEarlyExit(@NotNull String text, @NotNull IfCond ic) {
+        int from;
+        int to;
+        if (ic.bodyStart >= 0) {
+            from = ic.bodyStart;
+            to = Math.min(ic.ifEnd, text.length());
+            // body only (exclude closing brace if present)
+            if (to > from && text.charAt(to - 1) == '}') {
+                to--;
+            }
+        } else {
+            from = ic.condEnd + 1;
+            to = Math.min(ic.ifEnd, text.length());
+        }
+        if (from >= to) {
+            return false;
+        }
+        String body = text.substring(from, to);
+        return Pattern.compile("(?is)\\b(return|throw|exit|die|break|continue)\\b").matcher(body).find();
+    }
+
+    private static boolean conditionMentionsIsResultSet(@NotNull String cond, @NotNull String resultVar) {
         String escaped = Pattern.quote(resultVar);
-        // Only "!" applied directly to isResultSet(...) or $var instanceof — not unrelated !$error.
-        String negIsResultSet = "!\\s*(?:\\$[A-Za-z_][\\w]*(?:\\s*->\\s*\\$?[A-Za-z_][\\w]*)*\\s*->\\s*)?"
-                + "isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)";
-
-        // 1) Early-exit guard immediately preceding the fetch.
-        Pattern earlyExit = Pattern.compile(
-                "(?is)if\\s*\\([^;{]*" + negIsResultSet + "[^;{]*\\)"
-                        + "\\s*\\{[^}]*\\b(return|throw|exit|die|break|continue)\\b[^}]*\\}\\s*$"
-        );
-        if (earlyExit.matcher(before).find()) {
-            return true;
-        }
-
-        // Compact single-statement early exit: if (!isResultSet($r)) return;
-        Pattern earlyExitOneLiner = Pattern.compile(
-                "(?is)if\\s*\\([^;{]*" + negIsResultSet + "[^;{]*\\)"
-                        + "\\s*:\\s*\\b(return|throw|exit|die)\\b[^;]*;\\s*$"
-                        + "|if\\s*\\([^;{]*" + negIsResultSet + "[^;{]*\\)"
-                        + "\\s*\\b(return|throw|exit|die)\\b[^;]*;\\s*$"
-        );
-        if (earlyExitOneLiner.matcher(before).find()) {
-            return true;
-        }
-
-        // 2) Nested inside a positive if (isResultSet($var)) { ... fetch ... }
-        //    Includes compound conditions such as if (!$error && isResultSet($result)).
-        return isInsidePositiveIsResultSetBlock(before, resultVar);
+        return Pattern.compile(
+                "(?is)isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)"
+        ).matcher(cond).find();
     }
 
     /**
@@ -140,44 +245,41 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         return negInstanceof.matcher(cond).find();
     }
 
-    /**
-     * Walk from the last {@code if (...isResultSet($var)...)} forward with brace depth.
-     * If depth stays &gt; 0 through the end of {@code before}, the fetch is still inside that block.
-     */
-    private static boolean isInsidePositiveIsResultSetBlock(@NotNull String before, @NotNull String resultVar) {
-        String escaped = Pattern.quote(resultVar);
-        Pattern openIf = Pattern.compile(
-                "(?is)if\\s*\\(([^)]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^)]*)\\)\\s*\\{"
-        );
-        Matcher m = openIf.matcher(before);
-        int lastOpenEnd = -1;
-        while (m.find()) {
-            String cond = m.group(1);
-            // Skip only when isResultSet($var) itself is negated (early-exit style).
-            // Do NOT skip compound positives like: if (!$error && isResultSet($result))
-            if (conditionNegatesIsResultSet(cond, resultVar)) {
+    private static boolean isInsidePositiveIsResultSetBlock(
+            @NotNull String before,
+            @NotNull String resultVar,
+            @NotNull List<IfCond> ifs
+    ) {
+        // Prefer the innermost (last) still-open positive if.
+        for (int i = ifs.size() - 1; i >= 0; i--) {
+            IfCond ic = ifs.get(i);
+            if (ic.openBrace < 0 || ic.bodyStart < 0) {
                 continue;
             }
-            lastOpenEnd = m.end();
-        }
-        if (lastOpenEnd < 0) {
-            return false;
-        }
-        // Brace depth from the opening '{' of that if (already consumed by the match end).
-        int depth = 1;
-        for (int i = lastOpenEnd; i < before.length(); i++) {
-            char c = before.charAt(i);
-            if (c == '{') {
-                depth++;
-            } else if (c == '}') {
-                depth--;
-                if (depth == 0) {
-                    // Block closed before the fetch → sibling region, not dominating.
-                    return false;
+            if (!conditionMentionsIsResultSet(ic.condition, resultVar)) {
+                continue;
+            }
+            if (conditionNegatesIsResultSet(ic.condition, resultVar)) {
+                continue;
+            }
+            // Depth from this if's '{' through end of `before`: > 0 means fetch is still inside.
+            int depth = 1;
+            for (int j = ic.openBrace + 1; j < before.length(); j++) {
+                char c = before.charAt(j);
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}') {
+                    depth--;
+                    if (depth == 0) {
+                        break; // closed before fetch
+                    }
                 }
             }
+            if (depth > 0) {
+                return true;
+            }
         }
-        return depth > 0;
+        return false;
     }
 
     private static int lineStart(String text, int offset) {
@@ -192,5 +294,16 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             i++;
         }
         return text.substring(start, i);
+    }
+
+    private record IfCond(
+            int ifStart,
+            int openParen,
+            int condEnd,
+            int openBrace,
+            int bodyStart,
+            int ifEnd,
+            @NotNull String condition
+    ) {
     }
 }
