@@ -13,7 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Lightweight helpers — enough for MVP text inspections without deep PHP PSI.
+ * Lightweight helpers for text-based XOOPS inspections.
  */
 final class PhpTextUtil {
 
@@ -46,6 +46,137 @@ final class PhpTextUtil {
                 || path.contains("/templates_c/")
                 || path.contains("/cache/")
                 || path.contains("/node_modules/");
+    }
+
+    /**
+     * Mask comments and string/heredoc-like quoted regions with spaces so regex
+     * matches keep the same offsets but cannot hit non-code.
+     */
+    static @NotNull String maskCommentsAndStrings(@NotNull String text) {
+        char[] chars = text.toCharArray();
+        int i = 0;
+        int n = chars.length;
+        while (i < n) {
+            // // line comment
+            if (i + 1 < n && chars[i] == '/' && chars[i + 1] == '/') {
+                while (i < n && chars[i] != '\n') {
+                    chars[i++] = ' ';
+                }
+                continue;
+            }
+            // # line comment
+            if (chars[i] == '#') {
+                while (i < n && chars[i] != '\n') {
+                    chars[i++] = ' ';
+                }
+                continue;
+            }
+            // /* block comment */
+            if (i + 1 < n && chars[i] == '/' && chars[i + 1] == '*') {
+                chars[i++] = ' ';
+                chars[i++] = ' ';
+                while (i + 1 < n && !(chars[i] == '*' && chars[i + 1] == '/')) {
+                    chars[i++] = ' ';
+                }
+                if (i + 1 < n) {
+                    chars[i++] = ' ';
+                    chars[i++] = ' ';
+                }
+                continue;
+            }
+            // single-quoted string
+            if (chars[i] == '\'') {
+                chars[i++] = ' ';
+                while (i < n) {
+                    if (chars[i] == '\\' && i + 1 < n) {
+                        chars[i++] = ' ';
+                        chars[i++] = ' ';
+                        continue;
+                    }
+                    if (chars[i] == '\'') {
+                        chars[i++] = ' ';
+                        break;
+                    }
+                    chars[i++] = ' ';
+                }
+                continue;
+            }
+            // double-quoted string
+            if (chars[i] == '"') {
+                chars[i++] = ' ';
+                while (i < n) {
+                    if (chars[i] == '\\' && i + 1 < n) {
+                        chars[i++] = ' ';
+                        chars[i++] = ' ';
+                        continue;
+                    }
+                    if (chars[i] == '"') {
+                        chars[i++] = ' ';
+                        break;
+                    }
+                    chars[i++] = ' ';
+                }
+                continue;
+            }
+            i++;
+        }
+        return new String(chars);
+    }
+
+    /**
+     * Count non-string top-level commas between {@code openParen} (exclusive) and matching close paren.
+     * Returns -1 if unbalanced. 0 means single-argument call body (no commas).
+     */
+    static int countTopLevelCommasInCall(@NotNull String text, int openParenIndex) {
+        if (openParenIndex < 0 || openParenIndex >= text.length() || text.charAt(openParenIndex) != '(') {
+            return -1;
+        }
+        int depth = 1;
+        int commas = 0;
+        boolean inSq = false;
+        boolean inDq = false;
+        for (int i = openParenIndex + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (inSq) {
+                if (c == '\\' && i + 1 < text.length()) {
+                    i++;
+                    continue;
+                }
+                if (c == '\'') {
+                    inSq = false;
+                }
+                continue;
+            }
+            if (inDq) {
+                if (c == '\\' && i + 1 < text.length()) {
+                    i++;
+                    continue;
+                }
+                if (c == '"') {
+                    inDq = false;
+                }
+                continue;
+            }
+            if (c == '\'') {
+                inSq = true;
+                continue;
+            }
+            if (c == '"') {
+                inDq = true;
+                continue;
+            }
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return commas;
+                }
+            } else if (c == ',' && depth == 1) {
+                commas++;
+            }
+        }
+        return -1;
     }
 
     static @NotNull List<Match> findAll(@NotNull String text, @NotNull Pattern pattern) {

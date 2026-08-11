@@ -12,11 +12,15 @@ import org.jetbrains.annotations.NotNull;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Inserts a file-leading XOOPS_ROOT_PATH guard after a leading {@code <?php} tag only.
+ * Does not insert after {@code <?=} or mid-file tags that follow emitted content.
+ */
 public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
 
     private static final String GUARD = "defined('XOOPS_ROOT_PATH') || exit('Restricted access');\n";
-    private static final Pattern OPEN_TAG = Pattern.compile("<\\?(?:php|=)?", Pattern.CASE_INSENSITIVE);
-    /** Full normalized guard expression (not independent "defined" + "XOOPS_ROOT_PATH"). */
+    private static final Pattern OPEN_PHP = Pattern.compile("<\\?php\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OPEN_ECHO = Pattern.compile("<\\?=", Pattern.CASE_INSENSITIVE);
     private static final Pattern ROOT_PATH_GUARD = Pattern.compile(
             "defined\\s*\\(\\s*['\"]XOOPS_ROOT_PATH['\"]\\s*\\)",
             Pattern.CASE_INSENSITIVE
@@ -42,12 +46,19 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             return;
         }
         String text = document.getText();
-        if (ROOT_PATH_GUARD.matcher(text).find()) {
+        if (XoopsRootPathGuardInspection.hasLeadingTerminatingGuard(text)) {
             return;
         }
-        Matcher open = OPEN_TAG.matcher(text);
-        if (open.find()) {
-            int insertAt = open.end();
+
+        // Prefer a file-leading <?php (only whitespace/BOM before it).
+        Matcher php = OPEN_PHP.matcher(text);
+        if (php.find()) {
+            String prefix = text.substring(0, php.start());
+            if (!prefix.isBlank() && !prefix.replace("\uFEFF", "").isBlank()) {
+                // Tag is not at file start — refuse rather than corrupt mixed content.
+                return;
+            }
+            int insertAt = php.end();
             if (insertAt < text.length() && text.charAt(insertAt) == '\r') {
                 insertAt++;
             }
@@ -58,9 +69,26 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
                 insertAt++;
             }
             document.insertString(insertAt, GUARD);
-        } else {
-            document.insertString(0, "<?php\n" + GUARD);
+            PsiDocumentManager.getInstance(project).commitDocument(document);
+            return;
         }
-        PsiDocumentManager.getInstance(project).commitDocument(document);
+
+        // Leading <?= : insert a separate <?php guard block before it.
+        Matcher echo = OPEN_ECHO.matcher(text);
+        if (echo.find()) {
+            String prefix = text.substring(0, echo.start());
+            if (!prefix.isBlank() && !prefix.replace("\uFEFF", "").isBlank()) {
+                return;
+            }
+            document.insertString(echo.start(), "<?php\n" + GUARD + "?>\n");
+            PsiDocumentManager.getInstance(project).commitDocument(document);
+            return;
+        }
+
+        // No open tag — prepend full block.
+        if (!ROOT_PATH_GUARD.matcher(text).find()) {
+            document.insertString(0, "<?php\n" + GUARD);
+            PsiDocumentManager.getInstance(project).commitDocument(document);
+        }
     }
 }

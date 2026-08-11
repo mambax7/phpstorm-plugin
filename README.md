@@ -14,7 +14,7 @@ It brings XOOPS conventions into the IDE: inspections with Alt+Enter quick fixes
 
 ## Features
 
-- **Inspections + quick fixes** — root-path guards, `isResultSet` before `fetch*`, `query()` vs `exec()`, deprecated `queryF`/`quoteString`, raw `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE` → `\Xmf\Request`, missing registered templates, wrong Smarty delimiters, `include` → `include_once` for headers
+- **Inspections + quick fixes** — root-path guards, `isResultSet` before `fetch*`, `query()` vs `exec()`, deprecated `queryF`/`quoteString`, missing registered templates, wrong Smarty delimiters, `include` → `include_once` for headers. For input: **keyed** `$_GET`/`$_POST`/`$_COOKIE['key']` offer `\Xmf\Request::getString` fixes; **bare** `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE` and **keyed `$_REQUEST`** are warnings only (no auto-fix when the source is ambiguous)
 - **Live templates** — `xoguard`, `xofetch`, `xofetchdb`, `xohead`, `xolang`, `xocriteria`, `xorequest`, `xoexec`
 - **Language constants** — completion for `_MI_` / `_AM_` / `_MD_` / … from `language/**/*.php`
 - **Project tools** — detection balloon, scanner tool window, **Tools → XOOPS Support**

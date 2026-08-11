@@ -10,11 +10,14 @@ This folder is a standalone tree for **XOOPS Support** (PhpStorm plugin), simila
 - Name: **phpstorm-plugin**
 - Do **not** initialize with a README on GitHub if you will push this tree as the first commit.
 
-## 2. Initialize and push (from this directory)
+## 2. First push
+
+### Option A — uninitialized standalone tree (first-time upload)
+
+Use this only if the directory is **not** already a git clone (no `.git` folder):
 
 ```bash
-# Run from the root of your clone of XOOPS/phpstorm-plugin
-
+# Run from the root of the standalone project tree
 git init
 git branch -M main
 git add .
@@ -24,7 +27,20 @@ git remote add origin https://github.com/XOOPS/phpstorm-plugin.git
 git push -u origin main
 ```
 
-If the GitHub repo already has a default README commit, either force-push carefully or pull/rebase first.
+### Option B — existing clone
+
+If you already cloned `XOOPS/phpstorm-plugin`, do **not** run `git init` / `git remote add`. From the clone root:
+
+```bash
+git remote -v
+# if origin is wrong:
+git remote set-url origin https://github.com/XOOPS/phpstorm-plugin.git
+git add .
+git commit -m "Your message"
+git push -u origin main
+```
+
+If the remote already has commits you lack, `git pull --rebase` (or merge) before pushing.
 
 ## 3. CI
 

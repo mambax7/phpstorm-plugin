@@ -7,6 +7,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+import org.xoops.support.XoopsSupportPlugin;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,6 +26,9 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
+                if (!XoopsSupportPlugin.isEnabled(file)) {
+                    return;
+                }
                 if (!"xoops_version.php".equalsIgnoreCase(file.getName())) {
                     return;
                 }
@@ -34,7 +38,8 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 }
                 VirtualFile moduleRoot = vf.getParent();
                 String text = file.getText();
-                Matcher m = REGISTERED_TEMPLATE.matcher(text);
+                String code = PhpTextUtil.maskCommentsAndStrings(text);
+                Matcher m = REGISTERED_TEMPLATE.matcher(code);
                 while (m.find()) {
                     String template = m.group(1).replace('\\', '/');
                     boolean exists = childExists(moduleRoot, "templates/" + template)

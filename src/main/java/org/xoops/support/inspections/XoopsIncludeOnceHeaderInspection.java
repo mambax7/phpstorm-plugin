@@ -6,6 +6,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+import org.xoops.support.XoopsSupportPlugin;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,11 +27,15 @@ public final class XoopsIncludeOnceHeaderInspection extends LocalInspectionTool 
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
+                if (!XoopsSupportPlugin.isEnabled(file)) {
+                    return;
+                }
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {
                     return;
                 }
                 String text = file.getText();
-                Matcher m = INCLUDE_HEADER.matcher(text);
+                String code = PhpTextUtil.maskCommentsAndStrings(text);
+                Matcher m = INCLUDE_HEADER.matcher(code);
                 while (m.find()) {
                     int kwStart = m.start(1);
                     int kwEnd = m.end(1);

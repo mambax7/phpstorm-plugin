@@ -1,5 +1,7 @@
 package org.xoops.support.scanner;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -167,23 +169,44 @@ public final class XoopsProjectScanner {
                 return CoreProfile.XOOPS_25;
             }
         }
-        // Fallback: only look for XOOPS package names in root composer, not arbitrary deps.
+        // Fallback: bind package name to its version constraint (not independent whole-file matches).
         for (Path candidate : List.of(webRoot.resolve("composer.json"), projectRoot.resolve("composer.json"))) {
             Optional<String> body = readSmallFile(candidate);
             if (body.isEmpty()) {
                 continue;
             }
-            String text = body.get();
-            if (!text.toLowerCase(Locale.ROOT).contains("xoops")) {
+            CoreProfile fromComposer = profileFromComposerJson(body.get());
+            if (fromComposer != CoreProfile.UNKNOWN) {
+                return fromComposer;
+            }
+        }
+        return CoreProfile.UNKNOWN;
+    }
+
+    /**
+     * Match a single Composer require entry whose package name contains "xoops"
+     * and apply version patterns only to that entry's constraint.
+     */
+    private static CoreProfile profileFromComposerJson(@NotNull String json) {
+        // "xoops/something": "2.5.11" or "xoopsmodules/foo": "^2.7"
+        Pattern entry = Pattern.compile(
+                "(?is)\"([^\"]*xoops[^\"]*)\"\\s*:\\s*\"([^\"]+)\""
+        );
+        Matcher m = entry.matcher(json);
+        while (m.find()) {
+            String packageName = m.group(1).toLowerCase(Locale.ROOT);
+            String constraint = m.group(2);
+            // Skip unrelated URL strings
+            if (packageName.contains("http") || packageName.contains("github.com")) {
                 continue;
             }
-            if (VERSION_40.matcher(text).find()) {
+            if (VERSION_40.matcher(constraint).find()) {
                 return CoreProfile.XOOPS_40;
             }
-            if (VERSION_27.matcher(text).find()) {
+            if (VERSION_27.matcher(constraint).find()) {
                 return CoreProfile.XOOPS_27;
             }
-            if (VERSION_25.matcher(text).find()) {
+            if (VERSION_25.matcher(constraint).find()) {
                 return CoreProfile.XOOPS_25;
             }
         }

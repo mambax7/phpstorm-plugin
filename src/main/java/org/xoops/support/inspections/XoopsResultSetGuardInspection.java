@@ -6,6 +6,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+import org.xoops.support.XoopsSupportPlugin;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,10 +27,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final Pattern LINE_COMMENT = Pattern.compile("//[^\\n]*");
-    private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
-    private static final Pattern HASH_COMMENT = Pattern.compile("#[^\\n]*");
-
     private static final String FAIL_ACTION = "throw new \\RuntimeException('Database query failed');";
 
     @Override
@@ -37,6 +34,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
+                if (!XoopsSupportPlugin.isEnabled(file)) {
+                    return;
+                }
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {
                     return;
                 }
@@ -46,7 +46,7 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     String dbExpr = m.group(1).replaceAll("\\s+", "");
                     String resultVar = m.group(3);
                     // Only the code immediately before the fetch (comment-stripped).
-                    String before = stripPhpComments(text.substring(0, m.start()));
+                    String before = PhpTextUtil.maskCommentsAndStrings(text.substring(0, m.start()));
                     if (isFetchAlreadyGuarded(before, resultVar)) {
                         continue;
                     }
@@ -155,13 +155,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             }
         }
         return depth > 0;
-    }
-
-    private static @NotNull String stripPhpComments(@NotNull String text) {
-        String s = BLOCK_COMMENT.matcher(text).replaceAll(" ");
-        s = LINE_COMMENT.matcher(s).replaceAll(" ");
-        s = HASH_COMMENT.matcher(s).replaceAll(" ");
-        return s;
     }
 
     private static int lineStart(String text, int offset) {

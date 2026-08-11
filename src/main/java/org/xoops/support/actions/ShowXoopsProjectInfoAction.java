@@ -34,7 +34,11 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
                 } catch (Exception ex) {
                     String msg = "Scan failed: " + ex.getMessage();
                     com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
-                            () -> Messages.showErrorDialog(project, msg, "XOOPS Support - Project Info")
+                            () -> {
+                                if (!project.isDisposed()) {
+                                    Messages.showErrorDialog(project, msg, "XOOPS Support - Project Info");
+                                }
+                            }
                     );
                     return;
                 }

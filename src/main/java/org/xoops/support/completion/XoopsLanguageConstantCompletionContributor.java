@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.patterns.PlatformPatterns;
 import com.intellij.util.ProcessingContext;
 import org.jetbrains.annotations.NotNull;
+import org.xoops.support.XoopsSupportPlugin;
 
 import java.util.Locale;
 
@@ -30,6 +31,9 @@ public final class XoopsLanguageConstantCompletionContributor extends Completion
                             @NotNull CompletionResultSet result
                     ) {
                         Project project = parameters.getPosition().getProject();
+                        if (!XoopsSupportPlugin.isEnabled(project)) {
+                            return;
+                        }
                         String prefix = result.getPrefixMatcher().getPrefix();
                         if (prefix.length() < 2) {
                             return;

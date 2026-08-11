@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -12,6 +13,10 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.util.CachedValue;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
+import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,16 +26,19 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Project-level cache of XOOPS language constants from language/*.php define() lines.
- * Invalidated when language files change under VFS.
+ * Tied to {@link PsiModificationTracker#MODIFICATION_COUNT} so unsaved PSI edits invalidate
+ * the cache; VFS listener also clears the soft project key on disk changes.
  */
 @Service(Service.Level.PROJECT)
 public final class XoopsLanguageConstantsCache {
+
+    private static final Key<CachedValue<Set<String>>> CACHE_KEY =
+            Key.create("xoops.support.languageConstants");
 
     private static final Pattern DEFINE = Pattern.compile(
             "define\\s*\\(\\s*['\"](_(?:MI|AM|MD|CO|MB)_[A-Z0-9_]+)['\"]",
@@ -42,7 +50,6 @@ public final class XoopsLanguageConstantsCache {
     };
 
     private final Project project;
-    private final AtomicReference<Set<String>> cached = new AtomicReference<>(null);
 
     public XoopsLanguageConstantsCache(@NotNull Project project) {
         this.project = project;
@@ -83,19 +90,29 @@ public final class XoopsLanguageConstantsCache {
     }
 
     public void invalidate() {
-        cached.set(null);
+        project.putUserData(CACHE_KEY, null);
     }
 
     public @NotNull Set<String> getConstants() {
-        Set<String> hit = cached.get();
-        if (hit != null) {
-            return hit;
-        }
         try {
-            Set<String> rebuilt = ReadAction.compute(this::collectUnderReadLock);
-            cached.compareAndSet(null, rebuilt);
-            Set<String> after = cached.get();
-            return after != null ? after : rebuilt;
+            return ReadAction.compute(() -> {
+                CachedValue<Set<String>> cached = project.getUserData(CACHE_KEY);
+                if (cached == null) {
+                    cached = CachedValuesManager.getManager(project).createCachedValue(
+                            () -> {
+                                Set<String> value = collectUnderReadLock();
+                                return CachedValueProvider.Result.create(
+                                        value,
+                                        PsiModificationTracker.MODIFICATION_COUNT
+                                );
+                            },
+                            false
+                    );
+                    project.putUserData(CACHE_KEY, cached);
+                }
+                Set<String> result = cached.getValue();
+                return result != null ? result : Collections.emptySet();
+            });
         } catch (IndexNotReadyException e) {
             return Collections.emptySet();
         }

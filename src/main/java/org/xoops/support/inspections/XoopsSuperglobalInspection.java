@@ -7,6 +7,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
+import org.xoops.support.XoopsSupportPlugin;
 
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -14,6 +15,7 @@ import java.util.regex.Pattern;
 
 /**
  * Flags raw $_GET/$_POST/$_REQUEST/$_COOKIE in module code.
+ * Quick fixes only for keyed GET/POST/COOKIE (known source). Bare and $_REQUEST are warn-only.
  */
 public final class XoopsSuperglobalInspection extends LocalInspectionTool {
 
@@ -27,6 +29,9 @@ public final class XoopsSuperglobalInspection extends LocalInspectionTool {
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
+                if (!XoopsSupportPlugin.isEnabled(file)) {
+                    return;
+                }
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {
                     return;
                 }
@@ -37,8 +42,9 @@ public final class XoopsSuperglobalInspection extends LocalInspectionTool {
                     return;
                 }
                 String text = file.getText();
+                String code = PhpTextUtil.maskCommentsAndStrings(text);
 
-                Matcher keyed = SUPER_KEY.matcher(text);
+                Matcher keyed = SUPER_KEY.matcher(code);
                 boolean[] covered = new boolean[text.length() + 1];
                 while (keyed.find()) {
                     String source = keyed.group(1).toUpperCase(Locale.ROOT);
@@ -51,36 +57,36 @@ public final class XoopsSuperglobalInspection extends LocalInspectionTool {
                     for (int i = keyed.start(); i < keyed.end(); i++) {
                         covered[i] = true;
                     }
-                    String msg = "XOOPS: prefer \\Xmf\\Request over $_" + source;
-                    LocalQuickFix[] fixes;
+                    // $_REQUEST merges sources — warn only, no forced-source rewrite.
                     if ("REQUEST".equals(source)) {
-                        // Do not invent a single source — $_REQUEST merges GET/POST/COOKIE.
-                        fixes = new LocalQuickFix[]{
-                                replaceFix("Use Request GET", keyed.start(), keyed.end(), matched,
-                                        "\\Xmf\\Request::getString('" + key + "', '', 'GET')"),
-                                replaceFix("Use Request POST", keyed.start(), keyed.end(), matched,
-                                        "\\Xmf\\Request::getString('" + key + "', '', 'POST')"),
-                                replaceFix("Use Request COOKIE", keyed.start(), keyed.end(), matched,
-                                        "\\Xmf\\Request::getString('" + key + "', '', 'COOKIE')"),
-                        };
-                        msg = "XOOPS: prefer \\Xmf\\Request over $_REQUEST "
-                                + "(choose GET, POST, or COOKIE — $_REQUEST merges sources)";
-                    } else {
-                        String methodSource = switch (source) {
-                            case "POST" -> "POST";
-                            case "COOKIE" -> "COOKIE";
-                            default -> "GET";
-                        };
-                        String replacement = "\\Xmf\\Request::getString('" + key + "', '', '" + methodSource + "')";
-                        fixes = new LocalQuickFix[]{
-                                replaceFix("Replace with Xmf\\Request::getString()",
-                                        keyed.start(), keyed.end(), matched, replacement)
-                        };
+                        holder.registerProblem(
+                                leaf,
+                                "XOOPS: prefer \\Xmf\\Request with an explicit source over $_REQUEST['"
+                                        + key + "'] (no auto-fix: GET/POST/COOKIE is ambiguous)"
+                        );
+                        continue;
                     }
-                    holder.registerProblem(leaf, msg, fixes);
+                    String methodSource = switch (source) {
+                        case "POST" -> "POST";
+                        case "COOKIE" -> "COOKIE";
+                        default -> "GET";
+                    };
+                    // Keyed GET/POST/COOKIE string access → getString (key is a string literal).
+                    String replacement = "\\Xmf\\Request::getString('" + key + "', '', '" + methodSource + "')";
+                    holder.registerProblem(
+                            leaf,
+                            "XOOPS: prefer \\Xmf\\Request::getString over $_" + source + "['" + key + "']",
+                            new ReplaceRangeQuickFix(
+                                    "Replace with Xmf\\Request::getString()",
+                                    keyed.start(),
+                                    keyed.end(),
+                                    replacement,
+                                    matched
+                            )
+                    );
                 }
 
-                for (PhpTextUtil.Match match : PhpTextUtil.findAll(text, SUPER)) {
+                for (PhpTextUtil.Match match : PhpTextUtil.findAll(code, SUPER)) {
                     if (match.start() < covered.length && covered[match.start()]) {
                         continue;
                     }
@@ -88,30 +94,22 @@ public final class XoopsSuperglobalInspection extends LocalInspectionTool {
                     if (leaf == null) {
                         continue;
                     }
-                    String which = match.text();
+                    // Recover real text from original (code mask blanks strings/comments).
+                    String which = text.substring(match.start(), match.end());
                     String hint = switch (which) {
-                        case "$_GET" -> "\\Xmf\\Request::getString('…', '', 'GET')";
-                        case "$_POST" -> "\\Xmf\\Request::getString('…', '', 'POST')";
-                        case "$_COOKIE" -> "\\Xmf\\Request::getString('…', '', 'COOKIE')";
+                        case "$_GET" -> "\\Xmf\\Request::getString('…', '', 'GET') when key is known";
+                        case "$_POST" -> "\\Xmf\\Request::getString('…', '', 'POST') when key is known";
+                        case "$_COOKIE" -> "\\Xmf\\Request::getString('…', '', 'COOKIE') when key is known";
                         default -> "\\Xmf\\Request with an explicit source (avoid $_REQUEST)";
                     };
+                    // Bare superglobal — warning only, no quick fix.
                     holder.registerProblem(
                             leaf,
-                            "XOOPS: prefer " + hint + " over " + which
-                                    + " (Alt+Enter when written as " + which + "['key'])"
+                            "XOOPS: prefer " + hint + " over bare " + which
+                                    + " (Alt+Enter only for keyed $_GET/$_POST/$_COOKIE['key'])"
                     );
                 }
             }
         };
-    }
-
-    private static ReplaceRangeQuickFix replaceFix(
-            String family,
-            int start,
-            int end,
-            String expected,
-            String replacement
-    ) {
-        return new ReplaceRangeQuickFix(family, start, end, replacement, expected);
     }
 }

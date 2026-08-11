@@ -3,6 +3,6 @@
 <body>
 Warns when <code>fetchArray</code> / <code>fetchRow</code> / <code>fetchBoth</code> appears without a nearby
 <code>isResultSet</code> check. Prefer the two-part guard:
-<pre>if (!$db->isResultSet($result) || !$result instanceof \mysqli_result) { … }</pre>
+<pre>if (!$db-&gt;isResultSet($result) || !$result instanceof \mysqli_result) { … }</pre>
 </body>
 </html>
