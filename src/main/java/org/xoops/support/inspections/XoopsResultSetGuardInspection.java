@@ -89,10 +89,13 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
      */
     private static boolean isFetchAlreadyGuarded(@NotNull String before, @NotNull String resultVar) {
         String escaped = Pattern.quote(resultVar);
+        // Only "!" applied directly to isResultSet(...) or $var instanceof — not unrelated !$error.
+        String negIsResultSet = "!\\s*(?:\\$[A-Za-z_][\\w]*(?:\\s*->\\s*\\$?[A-Za-z_][\\w]*)*\\s*->\\s*)?"
+                + "isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)";
 
         // 1) Early-exit guard immediately preceding the fetch.
         Pattern earlyExit = Pattern.compile(
-                "(?is)if\\s*\\([^;{]*!\\s*[^;{]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^;{]*\\)"
+                "(?is)if\\s*\\([^;{]*" + negIsResultSet + "[^;{]*\\)"
                         + "\\s*\\{[^}]*\\b(return|throw|exit|die|break|continue)\\b[^}]*\\}\\s*$"
         );
         if (earlyExit.matcher(before).find()) {
@@ -101,9 +104,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
 
         // Compact single-statement early exit: if (!isResultSet($r)) return;
         Pattern earlyExitOneLiner = Pattern.compile(
-                "(?is)if\\s*\\([^;{]*!\\s*[^;{]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^;{]*\\)"
+                "(?is)if\\s*\\([^;{]*" + negIsResultSet + "[^;{]*\\)"
                         + "\\s*:\\s*\\b(return|throw|exit|die)\\b[^;]*;\\s*$"
-                        + "|if\\s*\\([^;{]*!\\s*[^;{]*isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)[^;{]*\\)"
+                        + "|if\\s*\\([^;{]*" + negIsResultSet + "[^;{]*\\)"
                         + "\\s*\\b(return|throw|exit|die)\\b[^;]*;\\s*$"
         );
         if (earlyExitOneLiner.matcher(before).find()) {
@@ -111,7 +114,28 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         }
 
         // 2) Nested inside a positive if (isResultSet($var)) { ... fetch ... }
+        //    Includes compound conditions such as if (!$error && isResultSet($result)).
         return isInsidePositiveIsResultSetBlock(before, resultVar);
+    }
+
+    /**
+     * True when {@code !} applies to the isResultSet($var) call itself (or to
+     * {@code $var instanceof}), not merely when some other operand is negated
+     * (e.g. {@code !$error && isResultSet($result)} is still a positive guard).
+     */
+    private static boolean conditionNegatesIsResultSet(@NotNull String cond, @NotNull String resultVar) {
+        String escaped = Pattern.quote(resultVar);
+        Pattern negCall = Pattern.compile(
+                "(?is)!\\s*(?:\\$[A-Za-z_][\\w]*(?:\\s*->\\s*\\$?[A-Za-z_][\\w]*)*\\s*->\\s*)?"
+                        + "isResultSet\\s*\\(\\s*" + escaped + "\\s*\\)"
+        );
+        if (negCall.matcher(cond).find()) {
+            return true;
+        }
+        Pattern negInstanceof = Pattern.compile(
+                "(?is)!\\s*" + escaped + "\\s*instanceof"
+        );
+        return negInstanceof.matcher(cond).find();
     }
 
     /**
@@ -127,13 +151,10 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         int lastOpenEnd = -1;
         while (m.find()) {
             String cond = m.group(1);
-            // Skip negated guards (those are early-exit style, handled above).
-            if (cond.replaceAll("\\s+", "").contains("!")) {
-                // Could be !isResultSet or !$x instanceof — not a positive wrap.
-                if (cond.matches("(?is).*!\\s*[\\w$\\->\\s]*isResultSet.*")
-                        || cond.matches("(?is).*!\\s*" + escaped + "\\s*instanceof.*")) {
-                    continue;
-                }
+            // Skip only when isResultSet($var) itself is negated (early-exit style).
+            // Do NOT skip compound positives like: if (!$error && isResultSet($result))
+            if (conditionNegatesIsResultSet(cond, resultVar)) {
+                continue;
             }
             lastOpenEnd = m.end();
         }
