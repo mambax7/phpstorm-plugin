@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templateSet group="XOOPS">
+    <template name="xoguard"
+              value="defined('XOOPS_ROOT_PATH') || exit('Restricted access');$END$"
+              description="XOOPS direct-access guard"
+              toReformat="true"
+              toShortenFQNames="true">
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <!-- $this->db style (handler / object methods) -->
+    <template name="xofetch"
+              value="$$result = $$this-&gt;db-&gt;query(&quot;$SQL$&quot;);&#10;if (!$$this-&gt;db-&gt;isResultSet($$result) || !($$result instanceof \mysqli_result)) {&#10;    return $DEFAULT$;&#10;}&#10;$$row = $$this-&gt;db-&gt;fetchArray($$result);$END$"
+              description="query + isResultSet guard + fetchArray ($this-&gt;db)"
+              toReformat="true"
+              toShortenFQNames="true">
+        <variable name="SQL" expression="" defaultValue="&quot;SELECT 1&quot;" alwaysStopAt="true"/>
+        <variable name="DEFAULT" expression="" defaultValue="null" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <!-- Local $db variable style -->
+    <template name="xofetchdb"
+              value="$$result = $$db-&gt;query($SQL$);&#10;if (!$$db-&gt;isResultSet($$result) || !($$result instanceof \mysqli_result)) {&#10;    return null;&#10;}&#10;$$row = $$db-&gt;fetchArray($$result);$END$"
+              description="query + isResultSet guard + fetchArray ($db)"
+              toReformat="true"
+              toShortenFQNames="true">
+        <variable name="SQL" expression="" defaultValue="&quot;SELECT 1&quot;" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <template name="xohead"
+              value="/**&#10; * $DESCRIPTION$&#10; *&#10; * @category  $CATEGORY$&#10; * @package   $PACKAGE$&#10; * @author    $AUTHOR$&#10; * @copyright $COPYRIGHT$&#10; * @license   GNU GPL 2.0 or later (https://www.gnu.org/licenses/gpl-2.0.html)&#10; * @link      https://xoops.org&#10; */$END$"
+              description="XOOPS PHPDoc file header"
+              toReformat="false"
+              toShortenFQNames="true">
+        <variable name="DESCRIPTION" expression="" defaultValue="&quot;XOOPS component&quot;" alwaysStopAt="true"/>
+        <variable name="CATEGORY" expression="" defaultValue="&quot;XOOPS&quot;" alwaysStopAt="true"/>
+        <variable name="PACKAGE" expression="" defaultValue="&quot;XOOPS&quot;" alwaysStopAt="true"/>
+        <variable name="AUTHOR" expression="" defaultValue="&quot;XOOPS Project&quot;" alwaysStopAt="true"/>
+        <variable name="COPYRIGHT" expression="" defaultValue="&quot;2000-2026 XOOPS Project (https://xoops.org)&quot;" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <template name="xolang"
+              value="define('_$PREFIX$_$MODULE$_$KEY$', '$VALUE$');$END$"
+              description="XOOPS language constant define"
+              toReformat="true"
+              toShortenFQNames="true">
+        <variable name="PREFIX" expression="" defaultValue="&quot;MI&quot;" alwaysStopAt="true"/>
+        <variable name="MODULE" expression="" defaultValue="&quot;MODULE&quot;" alwaysStopAt="true"/>
+        <variable name="KEY" expression="" defaultValue="&quot;NAME&quot;" alwaysStopAt="true"/>
+        <variable name="VALUE" expression="" defaultValue="&quot;My Module&quot;" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <template name="xocriteria"
+              value="$$criteria = new \CriteriaCompo();&#10;$$criteria-&gt;add(new \Criteria('$FIELD$', $VALUE$));$END$"
+              description="CriteriaCompo + Criteria"
+              toReformat="true"
+              toShortenFQNames="true">
+        <variable name="FIELD" expression="" defaultValue="&quot;uid&quot;" alwaysStopAt="true"/>
+        <variable name="VALUE" expression="" defaultValue="$$uid" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <template name="xorequest"
+              value="$$value = \Xmf\Request::getString('$KEY$', '$DEFAULT$', '$SOURCE$');$END$"
+              description="Scoped Xmf\Request::getString"
+              toReformat="true"
+              toShortenFQNames="true">
+        <variable name="KEY" expression="" defaultValue="&quot;id&quot;" alwaysStopAt="true"/>
+        <variable name="DEFAULT" expression="" defaultValue="&quot;&quot;" alwaysStopAt="true"/>
+        <variable name="SOURCE" expression="" defaultValue="&quot;POST&quot;" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+
+    <template name="xoexec"
+              value="$$this-&gt;db-&gt;exec(&quot;$SQL$&quot;);$END$"
+              description="Mutating SQL via exec()"
+              toReformat="true"
+              toShortenFQNames="true">
+        <variable name="SQL" expression="" defaultValue="&quot;UPDATE ...&quot;" alwaysStopAt="true"/>
+        <context>
+            <option name="PHP" value="true"/>
+        </context>
+    </template>
+</templateSet>

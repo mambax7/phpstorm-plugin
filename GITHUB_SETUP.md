@@ -1,0 +1,75 @@
+# Publishing to GitHub
+
+**Canonical repository:** [https://github.com/XOOPS/phpstorm-plugin](https://github.com/XOOPS/phpstorm-plugin)
+
+This folder is a standalone tree for **XOOPS Support** (PhpStorm plugin), similar in layout to [php-hammer](https://github.com/hammer-tools/php-hammer).
+
+## 1. Create the empty repo (if it does not exist yet)
+
+- Organization: **XOOPS**
+- Name: **phpstorm-plugin**
+- Do **not** initialize with a README on GitHub if you will push this tree as the first commit.
+
+## 2. Initialize and push (from this directory)
+
+```bash
+cd docs/phpStormPlugins/xoops-support   # or your checkout of this tree
+
+git init
+git branch -M main
+git add .
+git commit -m "Initial release of XOOPS Support 1.0.0 Alpha 1"
+git remote add origin https://github.com/XOOPS/phpstorm-plugin.git
+# or: git remote add origin git@github.com:XOOPS/phpstorm-plugin.git
+git push -u origin main
+```
+
+If the GitHub repo already has a default README commit, either force-push carefully or pull/rebase first.
+
+## 3. CI
+
+On push/PR to `main` or `master`, **`.github/workflows/gradle.yml`** runs:
+
+```text
+./gradlew check verifyPlugin buildPlugin
+```
+
+(Same task set as [php-hammer’s workflow](https://github.com/hammer-tools/php-hammer/blob/master/.github/workflows/gradle.yml).)
+
+The built ZIP is uploaded as the **xoops-support-plugin** artifact.
+
+First CI run downloads the PhpStorm SDK and Plugin Verifier — allow 10–20+ minutes.
+
+## 4. Releases
+
+Alpha tag:
+
+```bash
+git tag v1.0.0-alpha.1
+git push origin v1.0.0-alpha.1
+```
+
+**`.github/workflows/release.yml`** builds the plugin and attaches `build/distributions/*.zip` to a [GitHub Release](https://github.com/XOOPS/phpstorm-plugin/releases).
+
+## 5. Optional Marketplace later
+
+For JetBrains Marketplace:
+
+1. Create a publisher account and obtain `PUBLISH_TOKEN`.
+2. Add signing secrets if required (`CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`).
+3. Extend `build.gradle.kts` with `publishPlugin { token = … }` (see IntelliJ Platform docs).
+
+Not wired by default.
+
+## Layout checklist
+
+| Path | Purpose |
+| --- | --- |
+| `.github/workflows/gradle.yml` | CI build + artifact |
+| `.github/workflows/release.yml` | Tag → GitHub Release |
+| `src/` | Plugin sources |
+| `gradlew` / `gradlew.bat` | Wrapper |
+| `LICENSE` | GPL-2.0 |
+| `README.md` | Project home |
+| `CONTRIBUTING.md` | Dev guide |
+| `gradle.properties` | Version & platform |

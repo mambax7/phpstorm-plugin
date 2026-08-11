@@ -1,0 +1,26 @@
+### Gradle ###
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+### Build ###
+build/
+
+### IntelliJ Platform Gradle Plugin cache ###
+.intellijPlatform/
+
+### IntelliJ IDEA / PhpStorm ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+### OS ###
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### Logs / temp ###
+*.log
+*.tmp
+*~
