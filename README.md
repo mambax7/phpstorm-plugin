@@ -8,7 +8,7 @@ It brings XOOPS conventions into the IDE: inspections with Alt+Enter quick fixes
 | --- | --- |
 | Repository | [github.com/XOOPS/phpstorm-plugin](https://github.com/XOOPS/phpstorm-plugin) |
 | Plugin id | `org.xoops.plugin.support` |
-| Version | **1.0.0 Alpha 3** (`1.0.0-alpha.3`) |
+| Version | **1.0.0 Alpha 1** (`1.0.0-alpha.1`) |
 | Compatibility | PhpStorm **2024.3+** (since-build `243`, no upper cap — includes **2026.2.x**) |
 | License | [GPL-2.0-or-later](LICENSE) |
 
@@ -26,7 +26,7 @@ See [TUTORIAL.md](TUTORIAL.md) for a walkthrough and [CHANGELOG.md](CHANGELOG.md
 
 1. Download `xoops-support-*.zip` from [Releases](https://github.com/XOOPS/phpstorm-plugin/releases) (or build locally).
 2. PhpStorm → **Settings → Plugins → ⚙ → Install Plugin from Disk…**
-3. Restart PhpStorm.
+3. If PhpStorm offers restart, accept once after the first install (later updates often apply without restart).
 4. Open a XOOPS tree → **Tools → XOOPS Support**.
 
 ## Build from source
@@ -81,7 +81,7 @@ xoops-support/
 Edit `gradle.properties` for version and platform target:
 
 ```properties
-pluginVersion=1.0.0-alpha.3
+pluginVersion=1.0.0-alpha.1
 platformVersion=2024.3.5
 pluginSinceBuild=243
 pluginUntilBuild=          # empty = open-ended (2026.2+)

@@ -21,7 +21,7 @@ Use this only if the directory is **not** already a git clone (no `.git` folder)
 git init
 git branch -M main
 git add .
-git commit -m "XOOPS Support 1.0.0 Alpha 3 — PR review fixes"
+git commit -m "XOOPS Support 1.0.0 Alpha 1 — first public release"
 git remote add origin https://github.com/XOOPS/phpstorm-plugin.git
 # or: git remote add origin git@github.com:XOOPS/phpstorm-plugin.git
 git push -u origin main
@@ -61,8 +61,8 @@ First CI run downloads the PhpStorm SDK and Plugin Verifier — allow 10–20+ m
 Alpha tag:
 
 ```bash
-git tag v1.0.0-alpha.3
-git push origin v1.0.0-alpha.3
+git tag v1.0.0-alpha.1
+git push origin v1.0.0-alpha.1
 ```
 
 Tag **must** match `pluginVersion` in `gradle.properties` (release workflow enforces this).

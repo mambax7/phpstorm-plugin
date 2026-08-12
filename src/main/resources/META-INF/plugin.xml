@@ -3,35 +3,31 @@
 <idea-plugin>
     <id>org.xoops.plugin.support</id>
     <name>XOOPS Support</name>
-    <version>1.0.0-alpha.3</version>
+    <version>1.0.0-alpha.1</version>
     <vendor url="https://github.com/XOOPS/phpstorm-plugin" email="dev@xoops.org">XOOPS Project</vendor>
 
     <!-- since-build/until-build are patched from gradle.properties (until open-ended for 2026.2+). -->
 
     <description><![CDATA[
         <p><b>XOOPS Support</b> — PhpStorm / IntelliJ helper for XOOPS 2.5 / 2.7 / 4.0 module and core work.</p>
-        <p><i>1.0.0 Alpha 3</i> — early public preview; APIs and inspections may change.</p>
+        <p><i>1.0.0 Alpha 1</i> — first public preview; APIs and inspections may change.</p>
         <ul>
           <li>Project detection, scanner, and HTML overview tool window</li>
           <li>Inspections with Alt+Enter quick fixes (guards, query/exec, Request, Smarty, templates)</li>
           <li>Live templates, language-constant completion, hybrid module scaffold</li>
+          <li>Dynamic install/update (no IDE restart when unload succeeds)</li>
         </ul>
     ]]></description>
 
     <change-notes><![CDATA[
-        <h3>1.0.0 Alpha 3 (1.0.0-alpha.3)</h3>
-        <ul>
-          <li>Review fixes: scaffold index.php entry point, language-constant cache, off-EDT scans</li>
-          <li>Safer quick fixes (stale-range checks), multi-choice for $_REQUEST, result-set guard body</li>
-          <li>CI: persist-credentials off; release tag must match pluginVersion</li>
-        </ul>
-        <h3>1.0.0 Alpha 2 (1.0.0-alpha.2)</h3>
-        <ul>
-          <li><b>Fixed</b> install on PhpStorm 2026.2.x — open-ended <code>until-build</code></li>
-        </ul>
         <h3>1.0.0 Alpha 1 (1.0.0-alpha.1)</h3>
+        <p>First public alpha of <b>XOOPS Support</b>.</p>
         <ul>
-          <li>First public alpha of <b>XOOPS Support</b></li>
+          <li>Inspections + quick fixes: root-path guard, isResultSet before fetch*, query vs exec, deprecated DB API, templates, Smarty delimiters, Request</li>
+          <li>Live templates, language-constant completion, project scanner tool window, module scaffold</li>
+          <li>PhpStorm 2024.3+ (open-ended until-build, including 2026.2.x)</li>
+          <li>Dynamic plugin: load/unload without restart when possible</li>
+          <li>CI and GitHub Releases (tag must match pluginVersion)</li>
         </ul>
     ]]></change-notes>
 
