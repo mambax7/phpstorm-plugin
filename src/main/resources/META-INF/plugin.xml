@@ -1,0 +1,172 @@
+<!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<!-- Dynamic (no require-restart) so sandbox auto-reload works after buildPlugin. -->
+<idea-plugin>
+    <id>org.xoops.plugin.support</id>
+    <name>XOOPS Support</name>
+    <version>1.0.0-alpha.1</version>
+    <vendor url="https://github.com/XOOPS/phpstorm-plugin" email="dev@xoops.org">XOOPS Project</vendor>
+
+    <!-- since-build/until-build are patched from gradle.properties (until open-ended for 2026.2+). -->
+
+    <description><![CDATA[
+        <p><b>XOOPS Support</b> — PhpStorm / IntelliJ helper for XOOPS 2.5 / 2.7 / 4.0 module and core work.</p>
+        <p><i>1.0.0 Alpha 1</i> — first public preview; APIs and inspections may change.</p>
+        <ul>
+          <li>Project detection, scanner, and HTML overview tool window</li>
+          <li>Inspections with Alt+Enter quick fixes (guards, query/exec, Request, Smarty, templates)</li>
+          <li>Live templates, language-constant completion, hybrid module scaffold</li>
+          <li>Dynamic install/update (no IDE restart when unload succeeds)</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <h3>1.0.0 Alpha 1 (1.0.0-alpha.1)</h3>
+        <p>First public alpha of <b>XOOPS Support</b>.</p>
+        <ul>
+          <li>Inspections + quick fixes: root-path guard, isResultSet before fetch*, query vs exec, deprecated DB API, templates, Smarty delimiters, Request</li>
+          <li>Live templates, language-constant completion, project scanner tool window, module scaffold</li>
+          <li>PhpStorm 2024.3+ (open-ended until-build, including 2026.2.x)</li>
+          <li>Dynamic plugin: load/unload without restart when possible</li>
+          <li>CI and GitHub Releases (tag must match pluginVersion)</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.jetbrains.php</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="org.xoops.support.XoopsStartupActivity"/>
+
+        <notificationGroup id="XOOPS Support" displayType="BALLOON" isLogByDefault="true"/>
+
+        <projectConfigurable
+                parentId="language"
+                instance="org.xoops.support.settings.XoopsConfigurable"
+                id="org.xoops.support.settings"
+                displayName="XOOPS Support"/>
+
+        <toolWindow
+                id="XOOPS Support"
+                anchor="right"
+                factoryClass="org.xoops.support.ui.XoopsToolWindowFactory"
+                icon="/icons/toolWindowXoops.svg"/>
+
+        <defaultLiveTemplates file="liveTemplates/Xoops.xml"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsRootPathGuardInspection"
+                displayName="Missing XOOPS_ROOT_PATH direct-access guard"
+                shortName="XoopsRootPathGuard"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsSuperglobalInspection"
+                displayName="Raw superglobal usage (prefer \Xmf\Request)"
+                shortName="XoopsSuperglobal"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="ERROR"
+                implementationClass="org.xoops.support.inspections.XoopsQueryExecInspection"
+                displayName="Mutating SQL passed to query() (use exec())"
+                shortName="XoopsQueryExec"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="ERROR"
+                implementationClass="org.xoops.support.inspections.XoopsResultSetGuardInspection"
+                displayName="fetch* without isResultSet guard"
+                shortName="XoopsResultSetGuard"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsDeprecatedDbApiInspection"
+                displayName="Deprecated database API (queryF / quoteString)"
+                shortName="XoopsDeprecatedDbApi"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsMissingRegisteredTemplateInspection"
+                displayName="Registered template missing on disk"
+                shortName="XoopsMissingRegisteredTemplate"/>
+
+        <localInspection
+                language="PHP"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WEAK WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsIncludeOnceHeaderInspection"
+                displayName="include of header/footer instead of include_once"
+                shortName="XoopsIncludeOnceHeader"/>
+
+        <localInspection
+                language="Smarty"
+                groupPath="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsWrongSmartyDelimiterInspection"
+                displayName="Wrong Smarty delimiter (use XOOPS &lt;{ }&gt;)"
+                shortName="XoopsWrongSmartyDelimiter"/>
+
+        <completion.contributor
+                language="PHP"
+                implementationClass="org.xoops.support.completion.XoopsLanguageConstantCompletionContributor"/>
+
+        <!-- Same contributor for Smarty templates when the Smarty plugin is present -->
+        <completion.contributor
+                language="Smarty"
+                implementationClass="org.xoops.support.completion.XoopsLanguageConstantCompletionContributor"/>
+    </extensions>
+
+    <actions>
+        <group id="org.xoops.support.XoopsMenu"
+               text="XOOPS Support"
+               description="XOOPS development actions"
+               popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="org.xoops.support.ShowProjectInfo"
+                    class="org.xoops.support.actions.ShowXoopsProjectInfoAction"
+                    text="Show XOOPS Project Info"
+                    description="Detect XOOPS roots and modules in this project"/>
+            <action id="org.xoops.support.RefreshOverview"
+                    class="org.xoops.support.actions.RefreshXoopsOverviewAction"
+                    text="Refresh XOOPS Overview"
+                    description="Rescan modules and open the XOOPS Support tool window"/>
+            <action id="org.xoops.support.NewModuleStub"
+                    class="org.xoops.support.actions.NewXoopsModuleStubAction"
+                    text="New XOOPS Module Stub…"
+                    description="Scaffold a module (legacy + optional PSR-4 files)"/>
+        </group>
+        <action id="org.xoops.support.NewModuleFromNewMenu"
+                class="org.xoops.support.actions.NewXoopsModuleStubAction"
+                text="XOOPS Module…"
+                description="Scaffold a new XOOPS module">
+            <add-to-group group-id="NewGroup" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
