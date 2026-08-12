@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -28,12 +29,16 @@ import java.awt.event.ActionListener;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Background scan + clickable HTML findings.
  *
  * <p>Implements {@link Disposable} so listeners and deferred UI updates do not pin the
  * plugin classloader after tool-window content is disposed on plugin unload.
+ *
+ * <p>Each {@link #refresh()} bumps a request generation so older background scans cannot
+ * overwrite a newer result (toolbar Refresh and Tools → Refresh XOOPS Overview share this path).
  */
 public final class XoopsToolWindowPanel extends JPanel implements Disposable {
 
@@ -43,6 +48,7 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
     private final JLabel status = new JLabel("Ready");
     private final JButton refreshButton = new JButton("Refresh");
     private final AtomicBoolean disposed = new AtomicBoolean(false);
+    private final AtomicLong scanGeneration = new AtomicLong();
     private final HyperlinkListener hyperlinkListener = this::openFinding;
     private final ActionListener refreshListener = event -> refresh();
 
@@ -85,6 +91,7 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
             return;
         }
 
+        final long requestId = scanGeneration.incrementAndGet();
         refreshButton.setEnabled(false);
         status.setText("Scanning…");
 
@@ -95,28 +102,30 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
                     XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(basePath));
                     String html = new XoopsReportHtmlRenderer().render(report);
                     ApplicationManager.getApplication().invokeLater(
-                            () -> applyReport(report, html),
+                            () -> applyReport(report, html, requestId),
                             ModalityState.any(),
-                            __ -> disposed.get() || project.isDisposed()
+                            __ -> disposed.get() || project.isDisposed() || requestId != scanGeneration.get()
                     );
-                } catch (Throwable t) {
-                    String msg = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+                } catch (ProcessCanceledException e) {
+                    throw e;
+                } catch (Exception e) {
+                    String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                     String html = "<html><body style='font-family:sans-serif;padding:8px'>"
                             + "<p><b>Scan failed</b></p><p>"
                             + escape(msg)
                             + "</p></body></html>";
                     ApplicationManager.getApplication().invokeLater(
-                            () -> applyError(html),
+                            () -> applyError(html, requestId),
                             ModalityState.any(),
-                            __ -> disposed.get() || project.isDisposed()
+                            __ -> disposed.get() || project.isDisposed() || requestId != scanGeneration.get()
                     );
                 }
             }
         });
     }
 
-    private void applyReport(XoopsProjectReport report, String html) {
-        if (disposed.get() || project.isDisposed()) {
+    private void applyReport(XoopsProjectReport report, String html, long requestId) {
+        if (disposed.get() || project.isDisposed() || requestId != scanGeneration.get()) {
             return;
         }
         overview.setText(html);
@@ -125,8 +134,8 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         refreshButton.setEnabled(true);
     }
 
-    private void applyError(String html) {
-        if (disposed.get() || project.isDisposed()) {
+    private void applyError(String html, long requestId) {
+        if (disposed.get() || project.isDisposed() || requestId != scanGeneration.get()) {
             return;
         }
         overview.setText(html);
@@ -162,6 +171,7 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         if (!disposed.compareAndSet(false, true)) {
             return;
         }
+        scanGeneration.incrementAndGet(); // invalidate any in-flight scan callbacks
         overview.removeHyperlinkListener(hyperlinkListener);
         refreshButton.removeActionListener(refreshListener);
     }

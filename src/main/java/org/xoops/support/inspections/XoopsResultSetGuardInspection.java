@@ -22,12 +22,12 @@ import java.util.regex.Pattern;
  * <p>Conservative path rules (no full PHP CFG):
  * <ul>
  *   <li>Positive {@code if}: must mention isResultSet($var), must not negate it,
- *       and must have no top-level {@code ||}/{@code or} (rejects
- *       {@code isResultSet($r) || $fallback}).</li>
+ *       and must have no {@code ||}/{@code or} at any parenthesis depth (rejects
+ *       {@code isResultSet($r) || $fallback} and parenthesized forms).</li>
  *   <li>Early-exit {@code if}: must negate isResultSet($var) (including
- *       {@code !($db->isResultSet($r))}), must have no top-level {@code &&}/{@code and}
- *       (rejects {@code !isResultSet($r) && $strict}), and body must be a single
- *       exit statement (no nested blocks).</li>
+ *       {@code !($db->isResultSet($r))}), must have no {@code &&}/{@code and}
+ *       at any depth (rejects {@code !isResultSet($r) && $strict}), and body must
+ *       be a single exit statement (no nested blocks).</li>
  * </ul>
  *
  * <p>Quick fix inserts a throw-guard only at a PSI statement boundary; otherwise
@@ -291,33 +291,28 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
     }
 
     /**
-     * True when the condition has a top-level boolean operator at paren-depth 0.
+     * True when the condition contains {@code ||}/{@code or} (if {@code orOp}) or
+     * {@code &&}/{@code and} (if not), at any parenthesis depth.
      *
-     * @param orOp  if true, look for {@code ||} / {@code or}; if false, {@code &&} / {@code and}
+     * <p>Any-depth is intentional: parenthesized {@code (isResultSet($r) || $x)} or
+     * {@code (!isResultSet($r) && $strict)} must not count as a proven-safe guard.
      */
-    private static boolean hasTopLevelBoolOp(@NotNull String cond, boolean orOp) {
-        int depth = 0;
+    private static boolean hasBoolOpAnywhere(@NotNull String cond, boolean orOp) {
         for (int i = 0; i < cond.length(); i++) {
             char c = cond.charAt(i);
-            if (c == '(') {
-                depth++;
-            } else if (c == ')') {
-                depth = Math.max(0, depth - 1);
-            } else if (depth == 0) {
-                if (orOp) {
-                    if (c == '|' && i + 1 < cond.length() && cond.charAt(i + 1) == '|') {
-                        return true;
-                    }
-                    if (isWordAt(cond, i, "or")) {
-                        return true;
-                    }
-                } else {
-                    if (c == '&' && i + 1 < cond.length() && cond.charAt(i + 1) == '&') {
-                        return true;
-                    }
-                    if (isWordAt(cond, i, "and")) {
-                        return true;
-                    }
+            if (orOp) {
+                if (c == '|' && i + 1 < cond.length() && cond.charAt(i + 1) == '|') {
+                    return true;
+                }
+                if (isWordAt(cond, i, "or")) {
+                    return true;
+                }
+            } else {
+                if (c == '&' && i + 1 < cond.length() && cond.charAt(i + 1) == '&') {
+                    return true;
+                }
+                if (isWordAt(cond, i, "and")) {
+                    return true;
                 }
             }
         }
@@ -332,14 +327,16 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         if (!s.regionMatches(true, i, word, 0, n)) {
             return false;
         }
-        boolean leftOk = i == 0 || !Character.isLetterOrDigit(s.charAt(i - 1));
-        boolean rightOk = i + n >= s.length() || !Character.isLetterOrDigit(s.charAt(i + n));
+        // Java identifier parts (incl. '_') so "or" does not match inside "$or_flag".
+        boolean leftOk = i == 0 || !Character.isJavaIdentifierPart(s.charAt(i - 1));
+        boolean rightOk = i + n >= s.length() || !Character.isJavaIdentifierPart(s.charAt(i + n));
         return leftOk && rightOk;
     }
 
     /**
      * Positive {@code if (cond) { fetch }}: every path into the body must imply
-     * isResultSet($var). Rejects top-level OR ({@code isResultSet || fallback}).
+     * isResultSet($var). Rejects any OR ({@code isResultSet || fallback}, including
+     * parenthesized forms).
      */
     private static boolean isSafePositiveGuardCondition(@NotNull String cond, @NotNull String resultVar) {
         if (!conditionMentionsIsResultSet(cond, resultVar)) {
@@ -348,22 +345,22 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         if (conditionNegatesIsResultSet(cond, resultVar)) {
             return false;
         }
-        // Reject OR-paths: isResultSet($r) || $fallback
-        return !hasTopLevelBoolOp(cond, true);
+        // Reject OR-paths at any depth: isResultSet($r) || $fallback / (isResultSet($r) || $x)
+        return !hasBoolOpAnywhere(cond, true);
     }
 
     /**
      * Early-exit {@code if (cond) { return/throw }} before fetch: every fall-through
      * path must imply isResultSet($var). Requires a proven negation of isResultSet
-     * and rejects top-level AND ({@code !isResultSet($r) && $strict}) where exit is
-     * conditional.
+     * and rejects any AND ({@code !isResultSet($r) && $strict}, including
+     * parenthesized forms) where exit is conditional.
      */
     private static boolean isSafeEarlyExitCondition(@NotNull String cond, @NotNull String resultVar) {
         if (!conditionNegatesIsResultSet(cond, resultVar)) {
             return false;
         }
-        // Reject AND-paths that make the exit conditional on other predicates.
-        return !hasTopLevelBoolOp(cond, false);
+        // Reject AND-paths at any depth that make the exit conditional on other predicates.
+        return !hasBoolOpAnywhere(cond, false);
     }
 
     private static boolean isInsidePositiveIsResultSetGuard(
