@@ -1,5 +1,6 @@
 package org.xoops.support.completion;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.IndexNotReadyException;
@@ -33,9 +34,13 @@ import java.util.regex.Pattern;
  * Project-level cache of XOOPS language constants from language/*.php define() lines.
  * Tied to {@link PsiModificationTracker#MODIFICATION_COUNT} so unsaved PSI edits invalidate
  * the cache; VFS listener also clears the soft project key on disk changes.
+ *
+ * <p>Implements {@link Disposable}: the VFS listener parent must be the <em>service</em>
+ * (not the project). Parenting to the project keeps the listener after plugin unload and
+ * pins the plugin classloader — "didn't unload fully".
  */
 @Service(Service.Level.PROJECT)
-public final class XoopsLanguageConstantsCache {
+public final class XoopsLanguageConstantsCache implements Disposable {
 
     private static final Key<CachedValue<Set<String>>> CACHE_KEY =
             Key.create("xoops.support.languageConstants");
@@ -50,12 +55,14 @@ public final class XoopsLanguageConstantsCache {
     };
 
     private final Project project;
+    private volatile boolean disposed;
 
     public XoopsLanguageConstantsCache(@NotNull Project project) {
         this.project = project;
+        // Parent Disposable = this service (disposed on plugin unload), not the Project.
         VirtualFileManager.getInstance().addAsyncFileListener(
                 events -> {
-                    if (project.isDisposed()) {
+                    if (disposed || project.isDisposed()) {
                         return null;
                     }
                     boolean hit = false;
@@ -77,11 +84,13 @@ public final class XoopsLanguageConstantsCache {
                     return new AsyncFileListener.ChangeApplier() {
                         @Override
                         public void afterVfsChange() {
-                            invalidate();
+                            if (!disposed) {
+                                invalidate();
+                            }
                         }
                     };
                 },
-                project
+                this
         );
     }
 
@@ -90,12 +99,20 @@ public final class XoopsLanguageConstantsCache {
     }
 
     public void invalidate() {
-        project.putUserData(CACHE_KEY, null);
+        if (!project.isDisposed()) {
+            project.putUserData(CACHE_KEY, null);
+        }
     }
 
     public @NotNull Set<String> getConstants() {
+        if (disposed || project.isDisposed()) {
+            return Collections.emptySet();
+        }
         try {
             return ReadAction.compute(() -> {
+                if (disposed || project.isDisposed()) {
+                    return Collections.emptySet();
+                }
                 CachedValue<Set<String>> cached = project.getUserData(CACHE_KEY);
                 if (cached == null) {
                     cached = CachedValuesManager.getManager(project).createCachedValue(
@@ -116,6 +133,12 @@ public final class XoopsLanguageConstantsCache {
         } catch (IndexNotReadyException e) {
             return Collections.emptySet();
         }
+    }
+
+    @Override
+    public void dispose() {
+        disposed = true;
+        invalidate();
     }
 
     @RequiresReadLock

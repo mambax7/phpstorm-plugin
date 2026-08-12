@@ -1,5 +1,8 @@
 package org.xoops.support.ui;
 
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -7,7 +10,6 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.components.JBScrollPane;
 import org.jetbrains.annotations.NotNull;
 import org.xoops.support.scanner.XoopsProjectReport;
@@ -20,20 +22,29 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JToolBar;
 import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
 import java.awt.BorderLayout;
+import java.awt.event.ActionListener;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Background scan + clickable HTML findings.
+ *
+ * <p>Implements {@link Disposable} so listeners and deferred UI updates do not pin the
+ * plugin classloader after tool-window content is disposed on plugin unload.
  */
-public final class XoopsToolWindowPanel extends JPanel {
+public final class XoopsToolWindowPanel extends JPanel implements Disposable {
 
     private final Project project;
     private final JEditorPane overview = new JEditorPane("text/html",
             "<html><body style='font-family:sans-serif;padding:8px'>Scanning XOOPS project…</body></html>");
     private final JLabel status = new JLabel("Ready");
     private final JButton refreshButton = new JButton("Refresh");
+    private final AtomicBoolean disposed = new AtomicBoolean(false);
+    private final HyperlinkListener hyperlinkListener = this::openFinding;
+    private final ActionListener refreshListener = event -> refresh();
 
     public XoopsToolWindowPanel(Project project) {
         super(new BorderLayout());
@@ -41,11 +52,11 @@ public final class XoopsToolWindowPanel extends JPanel {
 
         overview.setEditable(false);
         overview.setContentType("text/html");
-        overview.addHyperlinkListener(this::openFinding);
+        overview.addHyperlinkListener(hyperlinkListener);
 
         JToolBar toolbar = new JToolBar();
         toolbar.setFloatable(false);
-        refreshButton.addActionListener(event -> refresh());
+        refreshButton.addActionListener(refreshListener);
         toolbar.add(refreshButton);
         toolbar.addSeparator();
         toolbar.add(status);
@@ -56,8 +67,11 @@ public final class XoopsToolWindowPanel extends JPanel {
     }
 
     public void refresh() {
+        if (disposed.get() || project.isDisposed()) {
+            return;
+        }
         String basePath = project.getBasePath();
-        if (basePath == null || project.isDisposed()) {
+        if (basePath == null) {
             overview.setText("<html><body>No project path is available.</body></html>");
             status.setText("No path");
             refreshButton.setEnabled(true);
@@ -80,21 +94,29 @@ public final class XoopsToolWindowPanel extends JPanel {
                 try {
                     XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(basePath));
                     String html = new XoopsReportHtmlRenderer().render(report);
-                    ToolWindowManager.getInstance(project).invokeLater(() -> applyReport(report, html));
+                    ApplicationManager.getApplication().invokeLater(
+                            () -> applyReport(report, html),
+                            ModalityState.any(),
+                            __ -> disposed.get() || project.isDisposed()
+                    );
                 } catch (Throwable t) {
                     String msg = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
                     String html = "<html><body style='font-family:sans-serif;padding:8px'>"
                             + "<p><b>Scan failed</b></p><p>"
                             + escape(msg)
                             + "</p></body></html>";
-                    ToolWindowManager.getInstance(project).invokeLater(() -> applyError(html));
+                    ApplicationManager.getApplication().invokeLater(
+                            () -> applyError(html),
+                            ModalityState.any(),
+                            __ -> disposed.get() || project.isDisposed()
+                    );
                 }
             }
         });
     }
 
     private void applyReport(XoopsProjectReport report, String html) {
-        if (project.isDisposed()) {
+        if (disposed.get() || project.isDisposed()) {
             return;
         }
         overview.setText(html);
@@ -104,7 +126,7 @@ public final class XoopsToolWindowPanel extends JPanel {
     }
 
     private void applyError(String html) {
-        if (project.isDisposed()) {
+        if (disposed.get() || project.isDisposed()) {
             return;
         }
         overview.setText(html);
@@ -118,7 +140,8 @@ public final class XoopsToolWindowPanel extends JPanel {
     }
 
     private void openFinding(HyperlinkEvent event) {
-        if (event.getEventType() != HyperlinkEvent.EventType.ACTIVATED || event.getDescription() == null) {
+        if (disposed.get() || event.getEventType() != HyperlinkEvent.EventType.ACTIVATED
+                || event.getDescription() == null) {
             return;
         }
         try {
@@ -132,5 +155,14 @@ public final class XoopsToolWindowPanel extends JPanel {
         } catch (Exception ignored) {
             status.setText("Could not open the selected finding");
         }
+    }
+
+    @Override
+    public void dispose() {
+        if (!disposed.compareAndSet(false, true)) {
+            return;
+        }
+        overview.removeHyperlinkListener(hyperlinkListener);
+        refreshButton.removeActionListener(refreshListener);
     }
 }

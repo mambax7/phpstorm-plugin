@@ -32,23 +32,19 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
                 try {
                     report = new XoopsProjectScanner().scan(Path.of(basePath));
                 } catch (Exception ex) {
-                    String msg = "Scan failed: " + ex.getMessage();
+    String msg = "Scan failed: " + ex.getMessage();
                     com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
-                            () -> {
-                                if (!project.isDisposed()) {
-                                    Messages.showErrorDialog(project, msg, "XOOPS Support - Project Info");
-                                }
-                            }
+                            () -> Messages.showErrorDialog(project, msg, "XOOPS Support - Project Info"),
+                            com.intellij.openapi.application.ModalityState.nonModal(),
+                            project.getDisposed()
                     );
                     return;
                 }
                 String message = formatReport(report);
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
-                        () -> {
-                            if (!project.isDisposed()) {
-                                Messages.showInfoMessage(project, message, "XOOPS Support - Project Info");
-                            }
-                        }
+                        () -> Messages.showInfoMessage(project, message, "XOOPS Support - Project Info"),
+                        com.intellij.openapi.application.ModalityState.nonModal(),
+                        project.getDisposed()
                 );
             }
         });
