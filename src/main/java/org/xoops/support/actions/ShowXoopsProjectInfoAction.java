@@ -3,6 +3,9 @@ package org.xoops.support.actions;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -30,20 +33,24 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
             public void run(@NotNull ProgressIndicator indicator) {
                 XoopsProjectReport report;
                 try {
+                    indicator.setText("Scanning XOOPS modules (cancellable)…");
                     report = new XoopsProjectScanner().scan(Path.of(basePath));
+                } catch (ProcessCanceledException pce) {
+                    // Let the progress framework treat this as a user cancel, not a failure dialog.
+                    throw pce;
                 } catch (Exception ex) {
-    String msg = "Scan failed: " + ex.getMessage();
-                    com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
+                    String msg = "Scan failed: " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+                    ApplicationManager.getApplication().invokeLater(
                             () -> Messages.showErrorDialog(project, msg, "XOOPS Support - Project Info"),
-                            com.intellij.openapi.application.ModalityState.nonModal(),
+                            ModalityState.nonModal(),
                             project.getDisposed()
                     );
                     return;
                 }
                 String message = formatReport(report);
-                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(
+                ApplicationManager.getApplication().invokeLater(
                         () -> Messages.showInfoMessage(project, message, "XOOPS Support - Project Info"),
-                        com.intellij.openapi.application.ModalityState.nonModal(),
+                        ModalityState.nonModal(),
                         project.getDisposed()
                 );
             }

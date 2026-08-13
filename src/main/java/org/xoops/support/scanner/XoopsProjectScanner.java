@@ -62,17 +62,18 @@ public final class XoopsProjectScanner {
         }
 
         List<Path> moduleRoots = findModuleRoots(projectRoot, webRoot, standaloneModule);
-        List<XoopsModuleInfo> modules = moduleRoots.stream()
-                .map(this::inspectModule)
-                .sorted(Comparator.comparing(XoopsModuleInfo::dirname, String.CASE_INSENSITIVE_ORDER))
-                .toList();
 
+        // Inspect + scan each module in one cancel-aware loop so Cancel is observed
+        // during metadata walks (inspectModule / countFiles), not only during source scan.
+        List<XoopsModuleInfo> modules = new ArrayList<>();
         List<XoopsFinding> findings = new ArrayList<>();
         for (Path moduleRoot : moduleRoots) {
-            // Cooperative cancel when run under ProgressManager (Overview Refresh).
+            ProgressManager.checkCanceled();
+            modules.add(inspectModule(moduleRoot));
             ProgressManager.checkCanceled();
             scanModule(moduleRoot, findings);
         }
+        modules.sort(Comparator.comparing(XoopsModuleInfo::dirname, String.CASE_INSENSITIVE_ORDER));
         findings.sort(Comparator
                 .comparing((XoopsFinding f) -> f.path().toString(), String.CASE_INSENSITIVE_ORDER)
                 .thenComparingInt(XoopsFinding::line));
@@ -143,7 +144,10 @@ public final class XoopsProjectScanner {
         }
         try (Stream<Path> paths = Files.walk(directory, 8)) {
             return paths
-                    .filter(Files::isRegularFile)
+                    .filter(path -> {
+                        ProgressManager.checkCanceled();
+                        return Files.isRegularFile(path);
+                    })
                     .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(suffix))
                     .count();
         } catch (IOException ignored) {
