@@ -43,8 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class XoopsToolWindowPanel extends JPanel implements Disposable {
 
     private final Project project;
-    private final JEditorPane overview = new JEditorPane("text/html",
-            "<html><body style='font-family:sans-serif;padding:8px'>Scanning XOOPS project…</body></html>");
+    private final JEditorPane overview = new JEditorPane("text/html", XoopsReportHtmlRenderer.scanningHtml());
     private final JLabel status = new JLabel("Ready");
     private final JButton refreshButton = new JButton("Refresh");
     private final AtomicBoolean disposed = new AtomicBoolean(false);
@@ -82,24 +81,13 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
     }
 
     private void showDisabled() {
-        overview.setText("<html><body style='font-family:sans-serif;padding:8px'>"
-                + "<p><b>XOOPS Support is disabled</b> for this project.</p>"
-                + "<p>Settings → Languages &amp; Frameworks → XOOPS Support.</p>"
-                + "</body></html>");
+        overview.setText(XoopsReportHtmlRenderer.disabledHtml());
         status.setText("Disabled");
         refreshButton.setEnabled(true);
     }
 
     private void showIdlePrompt() {
-        overview.setText("<html><body style='font-family:sans-serif;padding:8px'>"
-                + "<p><b>Overview is idle</b> — no automatic project scan.</p>"
-                + "<p>Click <b>Refresh</b> (or <b>Tools → XOOPS Support → Refresh XOOPS Overview</b>) "
-                + "to scan modules for convention findings. "
-                + "Full-tree scans read every module <code>.php</code>/<code>.tpl</code> and are "
-                + "expensive on large monorepos.</p>"
-                + "<p>Optional: Settings → XOOPS Support → "
-                + "<i>Auto-scan project when Overview tool window opens</i> (off by default).</p>"
-                + "</body></html>");
+        overview.setText(XoopsReportHtmlRenderer.idleHtml());
         status.setText("Idle — click Refresh to scan");
         refreshButton.setEnabled(true);
     }
@@ -110,7 +98,7 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         }
         String basePath = project.getBasePath();
         if (basePath == null) {
-            overview.setText("<html><body>No project path is available.</body></html>");
+            overview.setText(XoopsReportHtmlRenderer.noPathHtml());
             status.setText("No path");
             refreshButton.setEnabled(true);
             return;
@@ -147,10 +135,7 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
                     );
                 } catch (Exception e) {
                     String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-                    String html = "<html><body style='font-family:sans-serif;padding:8px'>"
-                            + "<p><b>Scan failed</b></p><p>"
-                            + escape(msg)
-                            + "</p></body></html>";
+                    String html = XoopsReportHtmlRenderer.failedHtml(msg);
                     ApplicationManager.getApplication().invokeLater(
                             () -> applyError(html, requestId),
                             ModalityState.any(),
@@ -165,9 +150,7 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         if (disposed.get() || project.isDisposed() || requestId != scanGeneration.get()) {
             return;
         }
-        overview.setText("<html><body style='font-family:sans-serif;padding:8px'>"
-                + "<p><b>Scan cancelled.</b></p>"
-                + "<p>Click <b>Refresh</b> to try again.</p></body></html>");
+        overview.setText(XoopsReportHtmlRenderer.cancelledHtml());
         status.setText("Cancelled");
         refreshButton.setEnabled(true);
     }
@@ -190,10 +173,6 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         overview.setCaretPosition(0);
         status.setText("Scan failed");
         refreshButton.setEnabled(true);
-    }
-
-    private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private void openFinding(HyperlinkEvent event) {

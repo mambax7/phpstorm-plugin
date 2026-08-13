@@ -12,13 +12,14 @@ and this project uses [Semantic Versioning](https://semver.org/) with pre-releas
 
 - **Overview auto-scan on tool-window open** — no longer walks every module `.php`/`.tpl` when the XOOPS Support tool window is created. That path froze multi-project monorepo boot (high disk I/O / power). Default is idle until **Refresh**.
 - Setting **Auto-scan project when Overview tool window opens** (off by default) for users who want the old behaviour.
-- Background scan tasks are **cancellable**; the filesystem scanner calls `ProgressManager.checkCanceled()` between modules and files.
+- Background scan tasks are **cancellable**; the filesystem scanner calls `ProgressManager.checkCanceled()` once per module and throttled every 32 paths in file walks (avoids per-path overhead on large monorepos while staying responsive).
 - Cancellation is observed during module **metadata** walks (`inspectModule` / `countFiles`), not only during source-file scanning (review feedback on PR #2).
 - **Tools → Show XOOPS Project Info** rethrows `ProcessCanceledException` so Cancel does not show as a scan-failure dialog.
 
 ### Changed
 
 - **Inspection tree placement** — all XOOPS inspections use top-level group **XOOPS** in Settings → Editor → Inspections (removed `groupPath="PHP"` so they are not buried under PHP → XOOPS).
+- Overview status HTML (disabled / idle / cancelled / failed / scanning) centralized in `XoopsReportHtmlRenderer` via shared `wrapBody()` helpers.
 
 ## [1.0.0-alpha.1] — 1.0.0 Alpha 1 — 2026-08-11
 

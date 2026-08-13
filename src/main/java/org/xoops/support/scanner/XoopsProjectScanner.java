@@ -19,10 +19,16 @@ import java.util.stream.Stream;
 /**
  * Filesystem scan of a XOOPS tree (ported/adapted filesystem).
  * Pure NIO — safe to run off the EDT.
+ *
+ * <p>Cancellation: {@link ProgressManager#checkCanceled()} is called once per module and
+ * throttled every {@link #CANCEL_CHECK_EVERY} paths inside file walks so monorepo scans stay
+ * responsive without paying a cancel-check on every path.
  */
 public final class XoopsProjectScanner {
 
     private static final long MAX_SOURCE_BYTES = 1_500_000L;
+    /** Paths between {@link ProgressManager#checkCanceled()} in tight file walks. */
+    private static final int CANCEL_CHECK_EVERY = 32;
     private static final Set<String> EXCLUDED = Set.of(
             ".git", ".gradle", ".idea", "build", "cache", "caches", "node_modules",
             "smarty_compile", "templates_c", "uploads", "vendor", "xoops_data"
@@ -65,12 +71,12 @@ public final class XoopsProjectScanner {
 
         // Inspect + scan each module in one cancel-aware loop so Cancel is observed
         // during metadata walks (inspectModule / countFiles), not only during source scan.
+        // One check per module (not per file) at this level; file walks throttle below.
         List<XoopsModuleInfo> modules = new ArrayList<>();
         List<XoopsFinding> findings = new ArrayList<>();
         for (Path moduleRoot : moduleRoots) {
             ProgressManager.checkCanceled();
             modules.add(inspectModule(moduleRoot));
-            ProgressManager.checkCanceled();
             scanModule(moduleRoot, findings);
         }
         modules.sort(Comparator.comparing(XoopsModuleInfo::dirname, String.CASE_INSENSITIVE_ORDER));
@@ -143,15 +149,27 @@ public final class XoopsProjectScanner {
             return 0;
         }
         try (Stream<Path> paths = Files.walk(directory, 8)) {
+            // Mutable counter for the lambda — throttle cancel checks in large trees.
+            int[] seen = {0};
             return paths
                     .filter(path -> {
-                        ProgressManager.checkCanceled();
+                        checkCanceledEvery(seen);
                         return Files.isRegularFile(path);
                     })
                     .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(suffix))
                     .count();
         } catch (IOException ignored) {
             return 0;
+        }
+    }
+
+    /**
+     * Call {@link ProgressManager#checkCanceled()} every {@link #CANCEL_CHECK_EVERY} paths.
+     * Keeps cancellation responsive without per-path overhead on large monorepos.
+     */
+    private static void checkCanceledEvery(int[] pathCounter) {
+        if (++pathCounter[0] % CANCEL_CHECK_EVERY == 0) {
+            ProgressManager.checkCanceled();
         }
     }
 
@@ -223,6 +241,7 @@ public final class XoopsProjectScanner {
     private void scanModule(Path moduleRoot, List<XoopsFinding> findings) {
         checkRegisteredTemplates(moduleRoot, findings);
         try (Stream<Path> paths = Files.walk(moduleRoot, 12)) {
+            int[] seen = {0};
             paths.filter(Files::isRegularFile)
                     .filter(path -> !isExcluded(path, moduleRoot))
                     .filter(p -> {
@@ -230,7 +249,7 @@ public final class XoopsProjectScanner {
                         return n.endsWith(".php") || n.endsWith(".tpl");
                     })
                     .forEach(path -> {
-                        ProgressManager.checkCanceled();
+                        checkCanceledEvery(seen);
                         scanSourceFile(path, findings);
                     });
         } catch (IOException exception) {
