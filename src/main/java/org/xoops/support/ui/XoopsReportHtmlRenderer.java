@@ -1,25 +1,75 @@
 package org.xoops.support.ui;
 
+import org.jetbrains.annotations.NotNull;
 import org.xoops.support.scanner.XoopsFinding;
 import org.xoops.support.scanner.XoopsModuleInfo;
 import org.xoops.support.scanner.XoopsProjectReport;
 
 /**
  * HTML overview for the tool window (adapted filesystem).
+ *
+ * <p>Status pages (idle / disabled / cancelled / failed) share {@link #wrapBody(String)} so
+ * padding and font styling live in one place.
  */
 public final class XoopsReportHtmlRenderer {
 
+    private static final String BODY_OPEN = "<html><body style='font-family:sans-serif;padding:8px'>";
+    private static final String BODY_CLOSE = "</body></html>";
+
+    /** Shared chrome for tool-window HTML snippets. */
+    public static @NotNull String wrapBody(@NotNull String innerHtml) {
+        return BODY_OPEN + innerHtml + BODY_CLOSE;
+    }
+
+    public static @NotNull String disabledHtml() {
+        return wrapBody(
+                "<p><b>XOOPS Support is disabled</b> for this project.</p>"
+                        + "<p>Settings → Languages &amp; Frameworks → XOOPS Support.</p>"
+        );
+    }
+
+    public static @NotNull String idleHtml() {
+        return wrapBody(
+                "<p><b>Overview is idle</b> — no automatic project scan.</p>"
+                        + "<p>Click <b>Refresh</b> (or <b>Tools → XOOPS Support → Refresh XOOPS Overview</b>) "
+                        + "to scan modules for convention findings. "
+                        + "Full-tree scans read every module <code>.php</code>/<code>.tpl</code> and are "
+                        + "expensive on large monorepos.</p>"
+                        + "<p>Optional: Settings → XOOPS Support → "
+                        + "<i>Auto-scan project when Overview tool window opens</i> (off by default).</p>"
+        );
+    }
+
+    public static @NotNull String cancelledHtml() {
+        return wrapBody(
+                "<p><b>Scan cancelled.</b></p>"
+                        + "<p>Click <b>Refresh</b> to try again.</p>"
+        );
+    }
+
+    public static @NotNull String scanningHtml() {
+        return wrapBody("Scanning XOOPS project…");
+    }
+
+    public static @NotNull String noPathHtml() {
+        return wrapBody("<p>No project path is available.</p>");
+    }
+
+    public static @NotNull String failedHtml(@NotNull String message) {
+        return wrapBody("<p><b>Scan failed</b></p><p>" + escape(message) + "</p>");
+    }
+
     public String render(XoopsProjectReport report) {
         if (!report.xoopsProject()) {
-            return "<html><body style='font-family:sans-serif;padding:8px'>"
-                    + "<h2>XOOPS not detected</h2>"
-                    + "<p>Open a XOOPS core (with <code>mainfile.php</code>) or a module containing "
-                    + "<code>xoops_version.php</code>.</p>"
-                    + "</body></html>";
+            return wrapBody(
+                    "<h2>XOOPS not detected</h2>"
+                            + "<p>Open a XOOPS core (with <code>mainfile.php</code>) or a module containing "
+                            + "<code>xoops_version.php</code>.</p>"
+            );
         }
 
         StringBuilder html = new StringBuilder(4096);
-        html.append("<html><body style='font-family:sans-serif;padding:8px'>")
+        html.append(BODY_OPEN)
                 .append("<h2>").append(escape(report.profile().displayName())).append("</h2>")
                 .append("<p><b>Web root:</b> <code>")
                 .append(escape(report.webRoot().toString()))
@@ -66,7 +116,7 @@ public final class XoopsReportHtmlRenderer {
 
         html.append("<hr/><p style='color:#666;font-size:90%'>XOOPS Support scanner (modules + sample findings). ")
                 .append("Editor inspections run separately under PHP / XOOPS.</p>");
-        return html.append("</body></html>").toString();
+        return html.append(BODY_CLOSE).toString();
     }
 
     private static String escape(String value) {

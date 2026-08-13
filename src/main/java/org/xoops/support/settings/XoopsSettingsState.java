@@ -15,6 +15,12 @@ public final class XoopsSettingsState implements PersistentStateComponent<XoopsS
 
     public boolean enabled = true;
     public boolean suppressStartupNotification = false;
+    /**
+     * When true, the Overview tool window scans the project as soon as it opens.
+     * Default false: full module tree walks are expensive on monorepos / multi-project
+     * boot; user must click Refresh (or Tools → Refresh XOOPS Overview).
+     */
+    public boolean autoScanOnToolWindowOpen = false;
     /** Auto | 2.5 | 2.7 | 4.0 */
     public String coreProfile = "Auto";
     public String tablePrefix = "";

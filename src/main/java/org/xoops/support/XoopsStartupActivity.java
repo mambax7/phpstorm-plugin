@@ -58,7 +58,7 @@ public final class XoopsStartupActivity implements StartupActivity {
                                     .createNotification(
                                             "XOOPS Support active",
                                             "Detected XOOPS markers (" + modules + " module(s) with xoops_version.php). "
-                                                    + "See Settings → Editor → Inspections → PHP → XOOPS, "
+                                                    + "See Settings → Editor → Inspections → XOOPS, "
                                                     + "and Tools → XOOPS Support.",
                                             NotificationType.INFORMATION
                                     )

@@ -43,8 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class XoopsToolWindowPanel extends JPanel implements Disposable {
 
     private final Project project;
-    private final JEditorPane overview = new JEditorPane("text/html",
-            "<html><body style='font-family:sans-serif;padding:8px'>Scanning XOOPS project…</body></html>");
+    private final JEditorPane overview = new JEditorPane("text/html", XoopsReportHtmlRenderer.scanningHtml());
     private final JLabel status = new JLabel("Ready");
     private final JButton refreshButton = new JButton("Refresh");
     private final AtomicBoolean disposed = new AtomicBoolean(false);
@@ -69,7 +68,28 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
 
         add(toolbar, BorderLayout.NORTH);
         add(new JBScrollPane(overview), BorderLayout.CENTER);
-        refresh();
+
+        // Never walk the module tree on tool-window create by default — monorepos freeze boot.
+        XoopsSettingsState settings = XoopsSettingsState.getInstance(project);
+        if (!settings.enabled) {
+            showDisabled();
+        } else if (settings.autoScanOnToolWindowOpen) {
+            refresh();
+        } else {
+            showIdlePrompt();
+        }
+    }
+
+    private void showDisabled() {
+        overview.setText(XoopsReportHtmlRenderer.disabledHtml());
+        status.setText("Disabled");
+        refreshButton.setEnabled(true);
+    }
+
+    private void showIdlePrompt() {
+        overview.setText(XoopsReportHtmlRenderer.idleHtml());
+        status.setText("Idle — click Refresh to scan");
+        refreshButton.setEnabled(true);
     }
 
     public void refresh() {
@@ -78,16 +98,13 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         }
         String basePath = project.getBasePath();
         if (basePath == null) {
-            overview.setText("<html><body>No project path is available.</body></html>");
+            overview.setText(XoopsReportHtmlRenderer.noPathHtml());
             status.setText("No path");
             refreshButton.setEnabled(true);
             return;
         }
         if (!XoopsSettingsState.getInstance(project).enabled) {
-            overview.setText("<html><body><p>XOOPS Support is disabled for this project "
-                    + "(Settings → XOOPS Support).</p></body></html>");
-            status.setText("Disabled");
-            refreshButton.setEnabled(true);
+            showDisabled();
             return;
         }
 
@@ -95,11 +112,15 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         refreshButton.setEnabled(false);
         status.setText("Scanning…");
 
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Scanning XOOPS project", false) {
+        // canBeCancelled = true so the user can stop a runaway monorepo walk.
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Scanning XOOPS project", true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
+                    indicator.setText("Scanning XOOPS modules (cancellable)…");
+                    indicator.checkCanceled();
                     XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(basePath));
+                    indicator.checkCanceled();
                     String html = new XoopsReportHtmlRenderer().render(report);
                     ApplicationManager.getApplication().invokeLater(
                             () -> applyReport(report, html, requestId),
@@ -107,13 +128,14 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
                             __ -> disposed.get() || project.isDisposed() || requestId != scanGeneration.get()
                     );
                 } catch (ProcessCanceledException e) {
-                    throw e;
+                    ApplicationManager.getApplication().invokeLater(
+                            () -> applyCancelled(requestId),
+                            ModalityState.any(),
+                            __ -> disposed.get() || project.isDisposed() || requestId != scanGeneration.get()
+                    );
                 } catch (Exception e) {
                     String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-                    String html = "<html><body style='font-family:sans-serif;padding:8px'>"
-                            + "<p><b>Scan failed</b></p><p>"
-                            + escape(msg)
-                            + "</p></body></html>";
+                    String html = XoopsReportHtmlRenderer.failedHtml(msg);
                     ApplicationManager.getApplication().invokeLater(
                             () -> applyError(html, requestId),
                             ModalityState.any(),
@@ -122,6 +144,15 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
                 }
             }
         });
+    }
+
+    private void applyCancelled(long requestId) {
+        if (disposed.get() || project.isDisposed() || requestId != scanGeneration.get()) {
+            return;
+        }
+        overview.setText(XoopsReportHtmlRenderer.cancelledHtml());
+        status.setText("Cancelled");
+        refreshButton.setEnabled(true);
     }
 
     private void applyReport(XoopsProjectReport report, String html, long requestId) {
@@ -142,10 +173,6 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
         overview.setCaretPosition(0);
         status.setText("Scan failed");
         refreshButton.setEnabled(true);
-    }
-
-    private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private void openFinding(HyperlinkEvent event) {
