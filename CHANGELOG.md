@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/) with pre-release tags
 (`1.0.0-alpha.N`).
 
+## [1.0.0-alpha.2] — 1.0.0 Alpha 2 — 2026-08-12
+
+### Fixed
+
+- **Overview auto-scan on tool-window open** — no longer walks every module `.php`/`.tpl` when the XOOPS Support tool window is created. That path froze multi-project monorepo boot (high disk I/O / power). Default is idle until **Refresh**.
+- Setting **Auto-scan project when Overview tool window opens** (off by default) for users who want the old behaviour.
+- Background scan tasks are **cancellable**; the filesystem scanner calls `ProgressManager.checkCanceled()` between modules and files.
+
+### Changed
+
+- **Inspection tree placement** — all XOOPS inspections use top-level group **XOOPS** in Settings → Editor → Inspections (removed `groupPath="PHP"` so they are not buried under PHP → XOOPS).
+
 ## [1.0.0-alpha.1] — 1.0.0 Alpha 1 — 2026-08-11
 
 First public alpha of **XOOPS Support** — a PhpStorm / IntelliJ helper for XOOPS 2.5 / 2.7 / 4.0 module and core work.

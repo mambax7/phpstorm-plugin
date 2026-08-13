@@ -23,6 +23,7 @@ public final class XoopsConfigurable implements Configurable {
     private final Project project;
     private JCheckBox enabledBox;
     private JCheckBox suppressNotifyBox;
+    private JCheckBox autoScanBox;
     private JComboBox<String> profileBox;
     private JTextField prefixField;
     private JPanel panel;
@@ -54,6 +55,12 @@ public final class XoopsConfigurable implements Configurable {
         form.add(suppressNotifyBox, c);
 
         c.gridy++;
+        autoScanBox = new JCheckBox(
+                "Auto-scan project when Overview tool window opens (slow on large trees)"
+        );
+        form.add(autoScanBox, c);
+
+        c.gridy++;
         form.add(new JLabel("Core profile:"), c);
         c.gridx = 1;
         profileBox = new JComboBox<>(new String[]{"Auto", "2.5", "2.7", "4.0"});
@@ -80,6 +87,7 @@ public final class XoopsConfigurable implements Configurable {
         String storedPrefix = s.tablePrefix == null ? "" : s.tablePrefix;
         return enabledBox.isSelected() != s.enabled
                 || suppressNotifyBox.isSelected() != s.suppressStartupNotification
+                || autoScanBox.isSelected() != s.autoScanOnToolWindowOpen
                 || !Objects.equals(selectedProfile, storedProfile)
                 || !Objects.equals(prefixField.getText().trim(), storedPrefix);
     }
@@ -89,6 +97,7 @@ public final class XoopsConfigurable implements Configurable {
         XoopsSettingsState s = XoopsSettingsState.getInstance(project);
         s.enabled = enabledBox.isSelected();
         s.suppressStartupNotification = suppressNotifyBox.isSelected();
+        s.autoScanOnToolWindowOpen = autoScanBox.isSelected();
         s.coreProfile = String.valueOf(profileBox.getSelectedItem());
         s.tablePrefix = prefixField.getText().trim();
     }
@@ -98,6 +107,7 @@ public final class XoopsConfigurable implements Configurable {
         XoopsSettingsState s = XoopsSettingsState.getInstance(project);
         enabledBox.setSelected(s.enabled);
         suppressNotifyBox.setSelected(s.suppressStartupNotification);
+        autoScanBox.setSelected(s.autoScanOnToolWindowOpen);
         profileBox.setSelectedItem(s.coreProfile == null ? "Auto" : s.coreProfile);
         prefixField.setText(s.tablePrefix == null ? "" : s.tablePrefix);
     }

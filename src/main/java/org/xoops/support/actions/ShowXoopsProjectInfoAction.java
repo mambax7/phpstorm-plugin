@@ -25,7 +25,7 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
             return;
         }
         String basePath = project.getBasePath();
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Scanning XOOPS project", false) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "Scanning XOOPS project", true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 XoopsProjectReport report;

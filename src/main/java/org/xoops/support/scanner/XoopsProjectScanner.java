@@ -1,5 +1,6 @@
 package org.xoops.support.scanner;
 
+import com.intellij.openapi.progress.ProgressManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -68,6 +69,8 @@ public final class XoopsProjectScanner {
 
         List<XoopsFinding> findings = new ArrayList<>();
         for (Path moduleRoot : moduleRoots) {
+            // Cooperative cancel when run under ProgressManager (Overview Refresh).
+            ProgressManager.checkCanceled();
             scanModule(moduleRoot, findings);
         }
         findings.sort(Comparator
@@ -222,7 +225,10 @@ public final class XoopsProjectScanner {
                         String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
                         return n.endsWith(".php") || n.endsWith(".tpl");
                     })
-                    .forEach(path -> scanSourceFile(path, findings));
+                    .forEach(path -> {
+                        ProgressManager.checkCanceled();
+                        scanSourceFile(path, findings);
+                    });
         } catch (IOException exception) {
             findings.add(new XoopsFinding(
                     "SCAN_ERROR",
