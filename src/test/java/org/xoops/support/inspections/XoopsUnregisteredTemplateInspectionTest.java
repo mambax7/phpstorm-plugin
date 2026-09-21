@@ -27,6 +27,18 @@ public final class XoopsUnregisteredTemplateInspectionTest {
     }
 
     @Test
+    public void assignmentSyntaxRegistersTemplatesToo() {
+        String manifest = """
+                <?php
+                $modversion['blocks'][1]['template'] = 'demo_block.tpl';
+                $modversion['templates'][2]['file'] = "demo_list.tpl";
+                """;
+        Set<String> names = XoopsUnregisteredTemplateInspection.registeredTemplates(manifest);
+        assertTrue(names.contains("demo_block.tpl"));
+        assertTrue(names.contains("demo_list.tpl"));
+    }
+
+    @Test
     public void moduleRootPrefixedRegistrationsMatchRelativeNames() {
         String manifest = """
                 <?php

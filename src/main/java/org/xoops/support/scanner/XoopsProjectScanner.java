@@ -39,7 +39,7 @@ public final class XoopsProjectScanner {
     static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.7(?:[^0-9]|$)");
     static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?4\\.0(?:[^0-9]|$)");
     static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
-            "(?is)['\"](?:file|template)['\"]\\s*=>\\s*['\"]([^'\"]+\\.tpl)['\"]"
+            "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
     );
     private static final Pattern MANIFEST_DIRNAME = Pattern.compile(
             "(?is)(?:\\[['\"]dirname['\"]]\\s*=|['\"]dirname['\"]\\s*=>)\\s*['\"]([a-z0-9_-]+)['\"]"
@@ -327,6 +327,7 @@ public final class XoopsProjectScanner {
                     registered.add(key.substring("blocks/".length()));
                 }
                 boolean exists = Files.isRegularFile(moduleRoot.resolve("templates").resolve(template))
+                        || Files.isRegularFile(moduleRoot.resolve("templates/blocks").resolve(template))
                         || Files.isRegularFile(moduleRoot.resolve("blocks").resolve(template))
                         || Files.isRegularFile(moduleRoot.resolve(template));
                 if (!exists) {
@@ -358,7 +359,11 @@ public final class XoopsProjectScanner {
                     .forEach(path -> {
                         checkCanceledEvery(seen);
                         String relative = directory.relativize(path).toString().replace('\\', '/');
-                        if (!registered.contains(relative.toLowerCase(Locale.ROOT))) {
+                        String key = relative.toLowerCase(Locale.ROOT);
+                        // templates/blocks/foo.tpl is registered as 'foo.tpl' by convention.
+                        boolean listed = registered.contains(key)
+                                || (key.startsWith("blocks/") && registered.contains(key.substring("blocks/".length())));
+                        if (!listed) {
                             findings.add(new XoopsFinding(
                                     "UNREGISTERED_TEMPLATE",
                                     path,

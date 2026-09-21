@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public final class XoopsMissingRegisteredTemplateInspection extends LocalInspectionTool {
 
     private static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
-            "(?is)['\"](?:file|template)['\"]\\s*=>\\s*['\"]([^'\"]+\\.tpl)['\"]"
+            "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
     );
 
     @Override
@@ -43,6 +43,7 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 while (m.find()) {
                     String template = m.group(1).replace('\\', '/');
                     boolean exists = childExists(moduleRoot, "templates/" + template)
+                            || childExists(moduleRoot, "templates/blocks/" + template)
                             || childExists(moduleRoot, "blocks/" + template)
                             || childExists(moduleRoot, template);
                     if (!exists) {

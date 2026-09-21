@@ -90,6 +90,26 @@ public final class XoopsProjectScannerTest {
     }
 
     @Test
+    public void blockTemplateUnderTemplatesBlocksIsRegisteredByBareName() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            Files.writeString(moduleRoot.resolve("xoops_version.php"), """
+                    <?php
+                    $modversion['blocks'][1]['template'] = 'demo_block.tpl';
+                    """);
+            Path blocks = moduleRoot.resolve("templates").resolve("blocks");
+            Files.createDirectories(blocks);
+            Files.writeString(blocks.resolve("demo_block.tpl"), "<{$block.title}>");
+
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.toString(), findings.isEmpty());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
     public void missingRegisteredTemplateScan() throws Exception {
         Path moduleRoot = Files.createTempDirectory("xoops-mod");
         try {

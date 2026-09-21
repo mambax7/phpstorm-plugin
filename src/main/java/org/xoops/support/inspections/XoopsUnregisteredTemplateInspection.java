@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTool {
 
     private static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
-            "(?is)['\"](?:file|template)['\"]\\s*=>\\s*['\"]([^'\"]+\\.tpl)['\"]"
+            "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
     );
 
     @Override
