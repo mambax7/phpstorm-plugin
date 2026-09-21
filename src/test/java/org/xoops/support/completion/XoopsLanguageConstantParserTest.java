@@ -37,6 +37,20 @@ public final class XoopsLanguageConstantParserTest {
     }
 
     @Test
+    public void parseIgnoresCommentedOutDefines() {
+        String php = """
+                <?php
+                // define('_MI_OLD', 'gone');
+                /* define('_MI_ALSO_OLD', 'gone'); */
+                define('_MI_LIVE', 'https://xoops.org # not a comment');
+                """;
+        List<XoopsLanguageConstantParser.Occurrence> occ = XoopsLanguageConstantParser.parse(php);
+        assertEquals(1, occ.size());
+        assertEquals("_MI_LIVE", occ.get(0).name());
+        assertEquals(php.indexOf("_MI_LIVE"), occ.get(0).offset());
+    }
+
+    @Test
     public void parseIgnoresEmbeddedFunctionNames() {
         String php = """
                 <?php

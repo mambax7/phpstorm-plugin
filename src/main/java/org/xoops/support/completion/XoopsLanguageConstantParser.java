@@ -2,6 +2,7 @@ package org.xoops.support.completion;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.xoops.support.inspections.PhpTextUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +33,9 @@ public final class XoopsLanguageConstantParser {
      */
     public static @NotNull List<Occurrence> parse(@NotNull String phpSource) {
         List<Occurrence> out = new ArrayList<>();
-        Matcher m = DEFINE.matcher(phpSource);
+        // Comments masked, strings kept: a commented-out define() is not a definition,
+        // and the mask preserves offsets so Ctrl+B still lands on the real name.
+        Matcher m = DEFINE.matcher(PhpTextUtil.maskCommentsOnly(phpSource));
         while (m.find()) {
             out.add(new Occurrence(m.group(1), m.start(1)));
         }
