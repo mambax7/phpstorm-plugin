@@ -315,7 +315,19 @@ public final class XoopsProjectScanner {
         if (!Files.isRegularFile(manifest)) {
             return; // module.json-only module: no legacy manifest to compare templates against
         }
-        String content = readSmallFile(manifest).orElse("");
+        Optional<String> read = readSmallFile(manifest);
+        if (read.isEmpty()) {
+            // Unreadable or oversized manifest: no data to compare against, so report
+            // that instead of flagging every template as unregistered.
+            findings.add(new XoopsFinding(
+                    "SCAN_ERROR",
+                    manifest,
+                    1,
+                    "xoops_version.php could not be read (unreadable or larger than " + MAX_SOURCE_BYTES + " bytes)"
+            ));
+            return;
+        }
+        String content = read.get();
         Set<String> registered = new LinkedHashSet<>();
         if (!content.isEmpty()) {
             // Masked copy keeps offsets, so lineAt() on the original content stays right.

@@ -163,6 +163,26 @@ public final class XoopsProjectScannerTest {
     }
 
     @Test
+    public void oversizedManifestReportsScanErrorNotUnregisteredTemplates() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            byte[] big = new byte[1_500_001];
+            java.util.Arrays.fill(big, (byte) ' ');
+            Files.write(moduleRoot.resolve("xoops_version.php"), big);
+            Path templates = moduleRoot.resolve("templates");
+            Files.createDirectories(templates);
+            Files.writeString(templates.resolve("demo_index.tpl"), "<{$x}>");
+
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertEquals(findings.toString(), 1, findings.size());
+            assertEquals("SCAN_ERROR", findings.get(0).kind());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
     public void missingRegisteredTemplateScan() throws Exception {
         Path moduleRoot = Files.createTempDirectory("xoops-mod");
         try {
