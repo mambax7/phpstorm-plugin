@@ -80,7 +80,15 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
         Set<String> out = new LinkedHashSet<>();
         Matcher m = REGISTERED_TEMPLATE.matcher(PhpTextUtil.maskCommentsOnly(manifestText));
         while (m.find()) {
-            out.add(m.group(1).replace('\\', '/').toLowerCase(Locale.ROOT));
+            String key = m.group(1).replace('\\', '/').toLowerCase(Locale.ROOT);
+            out.add(key);
+            // Accept module-root spellings too; relativeTemplateName() is relative
+            // to templates/ or blocks/ (same rule as XoopsProjectScanner).
+            if (key.startsWith("templates/")) {
+                out.add(key.substring("templates/".length()));
+            } else if (key.startsWith("blocks/")) {
+                out.add(key.substring("blocks/".length()));
+            }
         }
         return out;
     }
