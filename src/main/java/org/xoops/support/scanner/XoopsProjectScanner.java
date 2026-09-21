@@ -317,7 +317,15 @@ public final class XoopsProjectScanner {
             Matcher matcher = REGISTERED_TEMPLATE.matcher(content);
             while (matcher.find()) {
                 String template = matcher.group(1).replace('\\', '/');
-                registered.add(template.toLowerCase(Locale.ROOT));
+                String key = template.toLowerCase(Locale.ROOT);
+                registered.add(key);
+                // A manifest may spell the path from the module root; the walk keys are
+                // relative to templates/ or blocks/, so accept both spellings.
+                if (key.startsWith("templates/")) {
+                    registered.add(key.substring("templates/".length()));
+                } else if (key.startsWith("blocks/")) {
+                    registered.add(key.substring("blocks/".length()));
+                }
                 boolean exists = Files.isRegularFile(moduleRoot.resolve("templates").resolve(template))
                         || Files.isRegularFile(moduleRoot.resolve("blocks").resolve(template))
                         || Files.isRegularFile(moduleRoot.resolve(template));
@@ -343,10 +351,12 @@ public final class XoopsProjectScanner {
         if (!Files.isDirectory(directory)) {
             return;
         }
+        int[] seen = {0};
         try (Stream<Path> paths = Files.walk(directory, 6)) {
             paths.filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".tpl"))
                     .forEach(path -> {
+                        checkCanceledEvery(seen);
                         String relative = directory.relativize(path).toString().replace('\\', '/');
                         if (!registered.contains(relative.toLowerCase(Locale.ROOT))) {
                             findings.add(new XoopsFinding(

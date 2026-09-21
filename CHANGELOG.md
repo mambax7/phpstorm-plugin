@@ -19,6 +19,7 @@ and this project uses [Semantic Versioning](https://semver.org/) with pre-releas
 - Language-constant index keeps original spelling; resolution is exact-case (name recognition stays case-insensitive). Only a `$smarty.const.` prefix is stripped.
 - isResultSet reassignment ends at `;`, `,`, an unmatched closer, or `or`/`and`/`xor`; `?:`, `??`, `||`, `&&` keep the fetch inside the assignment.
 - ROOT_PATH guard is still required for includes that start with HTML (quick-fix declines without a file-leading open tag); stub detection ignores `;` inside quotes.
+- `xor` in an early-exit condition is not a dominating isResultSet guard; language-constant cap is enforced before the 5001st name; scanner accepts `templates/…` and `blocks/…` manifest spellings and honours Cancel while walking template trees.
 
 ## [1.0.0-alpha.3] — 1.0.0 Alpha 3 — 2026-09-02
 

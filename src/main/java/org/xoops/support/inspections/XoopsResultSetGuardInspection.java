@@ -437,6 +437,15 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         return false;
     }
 
+    private static boolean hasXorAnywhere(@NotNull String cond) {
+        for (int i = 0; i < cond.length(); i++) {
+            if (isWordAt(cond, i, "xor")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isWordAt(@NotNull String s, int i, @NotNull String word) {
         int n = word.length();
         if (i + n > s.length()) {
@@ -477,8 +486,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         if (!conditionNegatesIsResultSet(cond, resultVar)) {
             return false;
         }
-        // Reject AND-paths at any depth that make the exit conditional on other predicates.
-        return !hasBoolOpAnywhere(cond, false);
+        // Reject AND-paths at any depth that make the exit conditional on other predicates,
+        // and xor, which can be false while !isResultSet($var) is true.
+        return !hasBoolOpAnywhere(cond, false) && !hasXorAnywhere(cond);
     }
 
     private static boolean isInsidePositiveIsResultSetGuard(

@@ -70,6 +70,26 @@ public final class XoopsProjectScannerTest {
     }
 
     @Test
+    public void moduleRootRelativeRegistrationMatchesWalkKey() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            Files.writeString(moduleRoot.resolve("xoops_version.php"), """
+                    <?php
+                    $modversion['templates'][] = ['file' => 'templates/rooted.tpl', 'description' => ''];
+                    """);
+            Path templates = moduleRoot.resolve("templates");
+            Files.createDirectories(templates);
+            Files.writeString(templates.resolve("rooted.tpl"), "<{$x}>");
+
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.isEmpty());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
     public void missingRegisteredTemplateScan() throws Exception {
         Path moduleRoot = Files.createTempDirectory("xoops-mod");
         try {
