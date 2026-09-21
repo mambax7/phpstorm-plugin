@@ -2,10 +2,12 @@ package org.xoops.support.scanner;
 
 import com.intellij.openapi.progress.ProgressManager;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.xoops.support.inspections.PhpTextUtil;
 import org.xoops.support.inspections.XoopsManifestTemplates;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -55,6 +57,10 @@ public final class XoopsProjectScanner {
     );
 
     public XoopsProjectReport scan(Path requestedRoot) {
+        return scan(requestedRoot, "Auto");
+    }
+
+    public XoopsProjectReport scan(Path requestedRoot, @NotNull String coreVersionSetting) {
         Path projectRoot = requestedRoot.toAbsolutePath().normalize();
         Path webRoot = detectWebRoot(projectRoot);
         boolean standaloneModule = Files.isRegularFile(projectRoot.resolve("xoops_version.php"))
@@ -67,16 +73,16 @@ public final class XoopsProjectScanner {
             );
         }
 
-        List<Path> moduleRoots = findModuleRoots(projectRoot, webRoot, standaloneModule);
+        List<XoopsFinding> findings = new ArrayList<>();
+        List<Path> moduleRoots = findModuleRoots(projectRoot, webRoot, standaloneModule, findings);
 
         // Inspect + scan each module in one cancel-aware loop so Cancel is observed
         // during metadata walks (inspectModule / countFiles), not only during source scan.
         // One check per module (not per file) at this level; file walks throttle below.
         List<XoopsModuleInfo> modules = new ArrayList<>();
-        List<XoopsFinding> findings = new ArrayList<>();
         for (Path moduleRoot : moduleRoots) {
             ProgressManager.checkCanceled();
-            modules.add(inspectModule(moduleRoot));
+            modules.add(inspectModule(moduleRoot, findings));
             scanModule(moduleRoot, findings);
         }
         modules.sort(Comparator.comparing(XoopsModuleInfo::dirname, String.CASE_INSENSITIVE_ORDER));
@@ -84,11 +90,40 @@ public final class XoopsProjectScanner {
                 .comparing((XoopsFinding f) -> f.path().toString(), String.CASE_INSENSITIVE_ORDER)
                 .thenComparingInt(XoopsFinding::line));
 
-        CoreVersion coreVersion = standaloneModule && !isCoreRoot(webRoot)
-                ? CoreVersion.MODULE_ONLY
-                : detectCoreVersion(projectRoot, webRoot);
+        CoreVersion coreVersion = resolveScanCoreVersion(
+                coreVersionSetting, standaloneModule && !isCoreRoot(webRoot), projectRoot, webRoot
+        );
 
         return new XoopsProjectReport(true, projectRoot, webRoot, coreVersion, modules, findings);
+    }
+
+    /**
+     * Explicit Settings → Core Version wins. {@code Auto} (and unknown values) fall back
+     * to layout detection ({@code MODULE_ONLY}) or {@link #detectCoreVersion}.
+     */
+    static @NotNull CoreVersion resolveScanCoreVersion(
+            @NotNull String setting,
+            boolean standaloneModule,
+            @NotNull Path projectRoot,
+            @NotNull Path webRoot
+    ) {
+        CoreVersion fromSetting = coreVersionFromSetting(setting);
+        if (fromSetting != null) {
+            return fromSetting;
+        }
+        if (standaloneModule) {
+            return CoreVersion.MODULE_ONLY;
+        }
+        return detectCoreVersion(projectRoot, webRoot);
+    }
+
+    static @Nullable CoreVersion coreVersionFromSetting(@NotNull String setting) {
+        return switch (setting.trim()) {
+            case "2.5" -> CoreVersion.XOOPS_25;
+            case "2.7" -> CoreVersion.XOOPS_27;
+            case "4.0" -> CoreVersion.XOOPS_40;
+            default -> null;
+        };
     }
 
     private static Path detectWebRoot(Path projectRoot) {
@@ -106,7 +141,7 @@ public final class XoopsProjectScanner {
         return Files.isRegularFile(candidate.resolve("mainfile.php"));
     }
 
-    private static List<Path> findModuleRoots(Path projectRoot, Path webRoot, boolean standaloneModule) {
+    private static List<Path> findModuleRoots(Path projectRoot, Path webRoot, boolean standaloneModule, List<XoopsFinding> findings) {
         if (standaloneModule && !isCoreRoot(webRoot)) {
             return List.of(projectRoot);
         }
@@ -120,21 +155,22 @@ public final class XoopsProjectScanner {
                     .filter(path -> Files.isRegularFile(path.resolve("xoops_version.php"))
                             || Files.isRegularFile(path.resolve("module.json")))
                     .toList();
-        } catch (IOException ignored) {
+        } catch (IOException | UncheckedIOException exception) {
+            findings.add(scanError(modulesDirectory, "Could not list modules: " + exception.getMessage()));
             return List.of();
         }
     }
 
-    private XoopsModuleInfo inspectModule(Path moduleRoot) {
+    private XoopsModuleInfo inspectModule(Path moduleRoot, List<XoopsFinding> findings) {
         return new XoopsModuleInfo(
                 readModuleDirname(moduleRoot),
                 moduleRoot,
                 Files.isRegularFile(moduleRoot.resolve("xoops_version.php")),
                 Files.isRegularFile(moduleRoot.resolve("module.json")),
-                countFiles(moduleRoot.resolve("templates"), ".tpl"),
-                countFiles(moduleRoot.resolve("language"), ".php"),
-                countFiles(moduleRoot.resolve("preloads"), ".php"),
-                countFiles(moduleRoot.resolve("class"), ".php") + countFiles(moduleRoot.resolve("src"), ".php")
+                countFiles(moduleRoot.resolve("templates"), ".tpl", findings),
+                countFiles(moduleRoot.resolve("language"), ".php", findings),
+                countFiles(moduleRoot.resolve("preloads"), ".php", findings),
+                countFiles(moduleRoot.resolve("class"), ".php", findings) + countFiles(moduleRoot.resolve("src"), ".php", findings)
         );
     }
 
@@ -144,7 +180,7 @@ public final class XoopsProjectScanner {
         return matcher.find() ? matcher.group(1) : moduleRoot.getFileName().toString();
     }
 
-    private static long countFiles(Path directory, String suffix) {
+    private static long countFiles(Path directory, String suffix, List<XoopsFinding> findings) {
         if (!Files.isDirectory(directory)) {
             return 0;
         }
@@ -158,7 +194,8 @@ public final class XoopsProjectScanner {
                     })
                     .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(suffix))
                     .count();
-        } catch (IOException ignored) {
+        } catch (IOException | UncheckedIOException exception) {
+            findings.add(scanError(directory, "Could not count files: " + exception.getMessage()));
             return 0;
         }
     }
@@ -252,13 +289,10 @@ public final class XoopsProjectScanner {
                         checkCanceledEvery(seen);
                         scanSourceFile(path, findings);
                     });
+        } catch (UncheckedIOException exception) {
+            findings.add(scanError(moduleRoot, "Could not scan module: " + walkMessage(exception)));
         } catch (IOException exception) {
-            findings.add(new XoopsFinding(
-                    "SCAN_ERROR",
-                    moduleRoot,
-                    1,
-                    "Could not scan module: " + exception.getMessage()
-            ));
+            findings.add(scanError(moduleRoot, "Could not scan module: " + exception.getMessage()));
         }
     }
 
@@ -332,21 +366,9 @@ public final class XoopsProjectScanner {
             for (XoopsManifestTemplates.Registration reg
                     : XoopsManifestTemplates.find(PhpTextUtil.maskCommentsOnly(content))) {
                 String template = reg.name();
-                String key = template.toLowerCase(Locale.ROOT);
-                registered.add(key);
-                // A manifest may spell the path from the module root; the walk keys are
-                // relative to templates/ or blocks/, so accept both spellings.
-                if (key.startsWith("templates/")) {
-                    key = key.substring("templates/".length());
-                    registered.add(key);
-                }
-                if (key.startsWith("blocks/")) {
-                    registered.add(key.substring("blocks/".length()));
-                }
-                boolean exists = Files.isRegularFile(moduleRoot.resolve("templates").resolve(template))
-                        || Files.isRegularFile(moduleRoot.resolve("templates/blocks").resolve(template))
-                        || Files.isRegularFile(moduleRoot.resolve("blocks").resolve(template))
-                        || Files.isRegularFile(moduleRoot.resolve(template));
+                String relative = XoopsManifestTemplates.diskPath(template, reg.block());
+                registered.add(relative.toLowerCase(Locale.ROOT));
+                boolean exists = Files.isRegularFile(moduleRoot.resolve(relative));
                 if (!exists) {
                     findings.add(new XoopsFinding(
                             "MISSING_REGISTERED_TEMPLATE",
@@ -357,11 +379,12 @@ public final class XoopsProjectScanner {
                 }
             }
         }
-        addUnregisteredTemplates(moduleRoot.resolve("templates"), registered, findings);
-        addUnregisteredTemplates(moduleRoot.resolve("blocks"), registered, findings);
+        addUnregisteredTemplates(moduleRoot, moduleRoot.resolve("templates"), registered, findings);
+        addUnregisteredTemplates(moduleRoot, moduleRoot.resolve("blocks"), registered, findings);
     }
 
     private static void addUnregisteredTemplates(
+            Path moduleRoot,
             Path directory,
             Set<String> registered,
             List<XoopsFinding> findings
@@ -375,11 +398,9 @@ public final class XoopsProjectScanner {
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".tpl"))
                     .forEach(path -> {
-                        String relative = directory.relativize(path).toString().replace('\\', '/');
+                        String relative = moduleRoot.relativize(path).toString().replace('\\', '/');
                         String key = relative.toLowerCase(Locale.ROOT);
-                        // templates/blocks/foo.tpl is registered as 'foo.tpl' by convention.
-                        boolean listed = registered.contains(key)
-                                || (key.startsWith("blocks/") && registered.contains(key.substring("blocks/".length())));
+                        boolean listed = registered.contains(key);
                         if (!listed) {
                             findings.add(new XoopsFinding(
                                     "UNREGISTERED_TEMPLATE",
@@ -389,9 +410,23 @@ public final class XoopsProjectScanner {
                             ));
                         }
                     });
-        } catch (IOException ignored) {
-            // skip unreadable template trees
+        } catch (UncheckedIOException exception) {
+            findings.add(scanError(directory, "Could not scan templates: " + walkMessage(exception)));
+        } catch (IOException exception) {
+            findings.add(scanError(directory, "Could not scan templates: " + exception.getMessage()));
         }
+    }
+
+    private static @NotNull XoopsFinding scanError(@NotNull Path path, @NotNull String message) {
+        return new XoopsFinding("SCAN_ERROR", path, 1, message);
+    }
+
+    private static @NotNull String walkMessage(@NotNull UncheckedIOException exception) {
+        Throwable cause = exception.getCause();
+        String detail = cause != null && cause.getMessage() != null
+                ? cause.getMessage()
+                : exception.getMessage();
+        return detail == null ? exception.getClass().getSimpleName() : detail;
     }
 
     private static int lineAt(String content, int offset) {

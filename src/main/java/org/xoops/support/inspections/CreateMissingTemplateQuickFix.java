@@ -12,14 +12,18 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Creates templates/{name} under the module that owns xoops_version.php.
+ * Creates the on-disk template for a missing {@code xoops_version.php} registration.
+ * Block registrations land under {@code templates/blocks/} unless the name already
+ * includes a {@code templates/} or {@code blocks/} prefix.
  */
 public final class CreateMissingTemplateQuickFix implements LocalQuickFix {
 
     private final String templateName;
+    private final boolean block;
 
-    public CreateMissingTemplateQuickFix(@NotNull String templateName) {
+    public CreateMissingTemplateQuickFix(@NotNull String templateName, boolean block) {
         this.templateName = templateName.replace('\\', '/');
+        this.block = block;
     }
 
     @Override
@@ -34,21 +38,23 @@ public final class CreateMissingTemplateQuickFix implements LocalQuickFix {
             return;
         }
         VirtualFile moduleRoot = file.getVirtualFile().getParent();
+        String relative = XoopsManifestTemplates.diskPath(templateName, block);
         try {
             WriteAction.runAndWait(() -> {
-                VirtualFile templates = moduleRoot.findChild("templates");
-                if (templates == null) {
-                    templates = moduleRoot.createChildDirectory(this, "templates");
-                }
-                // Support nested names like admin/list.tpl
-                String[] parts = templateName.split("/");
-                VirtualFile dir = templates;
+                String[] parts = relative.split("/");
+                VirtualFile dir = moduleRoot;
                 for (int i = 0; i < parts.length - 1; i++) {
+                    if (dir == null) {
+                        return;
+                    }
                     VirtualFile next = dir.findChild(parts[i]);
                     if (next == null) {
                         next = dir.createChildDirectory(this, parts[i]);
                     }
                     dir = next;
+                }
+                if (dir == null) {
+                    return;
                 }
                 String leaf = parts[parts.length - 1];
                 if (dir.findChild(leaf) != null) {

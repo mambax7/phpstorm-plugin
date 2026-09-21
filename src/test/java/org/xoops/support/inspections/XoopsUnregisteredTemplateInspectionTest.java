@@ -21,9 +21,9 @@ public final class XoopsUnregisteredTemplateInspectionTest {
                 // 'file' => 'commented.tpl'
                 """;
         Set<String> names = XoopsUnregisteredTemplateInspection.registeredTemplates(manifest);
-        assertTrue(names.contains("demo_index.tpl"));
-        assertTrue(names.contains("demo_block.tpl"));
-        assertFalse(names.contains("commented.tpl"));
+        assertTrue(names.contains("templates/demo_index.tpl"));
+        assertTrue(names.contains("templates/demo_block.tpl"));
+        assertFalse(names.contains("templates/commented.tpl"));
     }
 
     @Test
@@ -34,8 +34,8 @@ public final class XoopsUnregisteredTemplateInspectionTest {
                 // 'file' => 'commented.tpl'
                 """;
         Set<String> names = XoopsUnregisteredTemplateInspection.registeredTemplates(manifest);
-        assertTrue(names.contains("listed.tpl"));
-        assertFalse(names.contains("commented.tpl"));
+        assertTrue(names.contains("templates/listed.tpl"));
+        assertFalse(names.contains("templates/commented.tpl"));
     }
 
     @Test
@@ -46,8 +46,8 @@ public final class XoopsUnregisteredTemplateInspectionTest {
                 $modversion['templates'][2]['file'] = "demo_list.tpl";
                 """;
         Set<String> names = XoopsUnregisteredTemplateInspection.registeredTemplates(manifest);
-        assertTrue(names.contains("demo_block.tpl"));
-        assertTrue(names.contains("demo_list.tpl"));
+        assertTrue(names.contains("templates/blocks/demo_block.tpl"));
+        assertTrue(names.contains("templates/demo_list.tpl"));
     }
 
     @Test
@@ -58,12 +58,12 @@ public final class XoopsUnregisteredTemplateInspectionTest {
                 $modversion['templates'][] = ['template' => 'blocks/rooted_block.tpl'];
                 """;
         Set<String> names = XoopsUnregisteredTemplateInspection.registeredTemplates(manifest);
-        assertTrue(names.contains("rooted.tpl"));
-        assertTrue(names.contains("rooted_block.tpl"));
+        assertTrue(names.contains("templates/rooted.tpl"));
+        assertTrue(names.contains("blocks/rooted_block.tpl"));
         assertTrue(names.contains("templates/rooted.tpl"));
         Set<String> full = XoopsUnregisteredTemplateInspection.registeredTemplates(
                 "<?php $modversion['templates'][] = ['file' => 'templates/blocks/deep_block.tpl'];");
-        assertTrue(full.contains("blocks/deep_block.tpl"));
-        assertTrue(full.contains("deep_block.tpl"));
+        assertTrue(full.contains("templates/blocks/deep_block.tpl"));
+        assertFalse(full.contains("deep_block.tpl"));
     }
 }

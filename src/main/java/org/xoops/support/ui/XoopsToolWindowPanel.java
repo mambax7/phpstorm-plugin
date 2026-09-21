@@ -119,7 +119,10 @@ public final class XoopsToolWindowPanel extends JPanel implements Disposable {
                 try {
                     indicator.setText("Scanning XOOPS modules (cancellable)…");
                     indicator.checkCanceled();
-                    XoopsProjectReport report = new XoopsProjectScanner().scan(Path.of(basePath));
+                    XoopsProjectReport report = new XoopsProjectScanner().scan(
+                            Path.of(basePath),
+                            XoopsSettingsState.getInstance(project).resolvedCoreVersion()
+                    );
                     indicator.checkCanceled();
                     String html = new XoopsReportHtmlRenderer().render(report);
                     ApplicationManager.getApplication().invokeLater(

@@ -3,6 +3,7 @@ package org.xoops.support.inspections;
 import com.intellij.codeInspection.LocalInspectionTool;
 import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
@@ -30,8 +31,11 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
                 if (vf == null) {
                     return;
                 }
-                String relative = relativeTemplateName(vf);
-                VirtualFile moduleRoot = relative == null ? null : moduleRootOf(vf);
+                VirtualFile moduleRoot = moduleRootOf(vf);
+                String relative = moduleRoot == null ? null : VfsUtilCore.getRelativePath(vf, moduleRoot, '/');
+                if (relative == null || !(relative.startsWith("templates/") || relative.startsWith("blocks/"))) {
+                    return;
+                }
                 VirtualFile manifest = moduleRoot == null ? null : moduleRoot.findChild("xoops_version.php");
                 PsiFile manifestPsi = manifest == null ? null : file.getManager().findFile(manifest);
                 if (relative == null || manifestPsi == null) {
@@ -39,8 +43,7 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
                 }
                 Set<String> registered = registeredTemplates(manifestPsi.getText());
                 String key = relative.toLowerCase(Locale.ROOT);
-                if (registered.contains(key)
-                        || (key.startsWith("blocks/") && registered.contains(key.substring("blocks/".length())))) {
+                if (registered.contains(key)) {
                     return;
                 }
                 PsiElement anchor = file.getFirstChild() != null ? file.getFirstChild() : file;
@@ -75,20 +78,6 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
     /** Registered names as lookup keys; see {@link XoopsManifestTemplates#keys(String)}. */
     static @NotNull Set<String> registeredTemplates(@NotNull String manifestText) {
         return XoopsManifestTemplates.keys(manifestText);
-    }
-
-    private static @Nullable String relativeTemplateName(@NotNull VirtualFile tpl) {
-        VirtualFile dir = tpl.getParent();
-        StringBuilder tail = new StringBuilder(tpl.getName());
-        while (dir != null) {
-            String dirName = dir.getName().toLowerCase(Locale.ROOT);
-            if ("templates".equals(dirName) || "blocks".equals(dirName)) {
-                return tail.toString().replace('\\', '/');
-            }
-            tail.insert(0, dir.getName() + "/");
-            dir = dir.getParent();
-        }
-        return null;
     }
 
     private static @Nullable VirtualFile moduleRootOf(@NotNull VirtualFile tpl) {

@@ -5,7 +5,6 @@ import com.intellij.codeInspection.ProblemDescriptor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,10 +16,16 @@ public final class ReplacePsiTextQuickFix implements LocalQuickFix {
 
     private final String familyName;
     private final String replacement;
+    private final String expected;
 
-    public ReplacePsiTextQuickFix(@NotNull String familyName, @NotNull String replacement) {
+    public ReplacePsiTextQuickFix(
+            @NotNull String familyName,
+            @NotNull String replacement,
+            @NotNull String expected
+    ) {
         this.familyName = familyName;
         this.replacement = replacement;
+        this.expected = expected;
     }
 
     @Override
@@ -42,7 +47,13 @@ public final class ReplacePsiTextQuickFix implements LocalQuickFix {
         if (range == null || range.getEndOffset() > document.getTextLength()) {
             return;
         }
-        document.replaceString(range.getStartOffset(), range.getEndOffset(), replacement);
-        PsiDocumentManager.getInstance(project).commitDocument(document);
+        DocumentEditHelper.replace(
+                project,
+                document,
+                range.getStartOffset(),
+                range.getEndOffset(),
+                replacement,
+                expected
+        );
     }
 }

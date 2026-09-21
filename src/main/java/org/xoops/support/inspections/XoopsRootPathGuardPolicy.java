@@ -218,16 +218,25 @@ public final class XoopsRootPathGuardPolicy {
         return firstOpenTagEnd(text) >= 0;
     }
 
-    /** End offset of the first {@code <?php} / {@code <?} at any position. -1 if none. */
+    /** End offset of the first {@code <?php} / {@code <?=} / {@code <?} at any position. -1 if none. */
     private static int firstOpenTagEnd(@NotNull String text) {
+        int start = -1;
+        int end = -1;
         Matcher php = OPEN_PHP.matcher(text);
-        Matcher sh = OPEN_SHORT.matcher(text);
-        boolean hasPhp = php.find();
-        boolean hasShort = sh.find();
-        if (hasPhp && (!hasShort || php.start() <= sh.start())) {
-            return php.end();
+        if (php.find()) {
+            start = php.start();
+            end = php.end();
         }
-        return hasShort ? sh.end() : -1;
+        Matcher echo = OPEN_ECHO.matcher(text);
+        if (echo.find() && (start < 0 || echo.start() < start)) {
+            start = echo.start();
+            end = echo.end();
+        }
+        Matcher sh = OPEN_SHORT.matcher(text);
+        if (sh.find() && (start < 0 || sh.start() < start)) {
+            end = sh.end();
+        }
+        return end;
     }
 
     /**

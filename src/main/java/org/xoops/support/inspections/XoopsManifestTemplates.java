@@ -21,12 +21,20 @@ import java.util.regex.Pattern;
  */
 public final class XoopsManifestTemplates {
 
+    public enum Section {
+        TEMPLATES,
+        BLOCKS
+    }
+
     /** A registered template name and the offset of that name in the manifest text. */
-    public record Registration(@NotNull String name, int nameOffset) {
+    public record Registration(@NotNull String name, int nameOffset, @NotNull Section section) {
+        public boolean block() {
+            return section == Section.BLOCKS;
+        }
     }
 
     private static final Pattern MODVERSION_TEMPLATES = Pattern.compile(
-            "(?i)\\$modversion\\s*\\[\\s*['\"](?:templates|blocks)['\"]\\s*\\]"
+            "(?i)\\$modversion\\s*\\[\\s*['\"](templates|blocks)['\"]\\s*\\]"
     );
     private static final Pattern FILE_OR_TEMPLATE = Pattern.compile(
             "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
@@ -46,11 +54,12 @@ public final class XoopsManifestTemplates {
         int searchFrom = 0;
         while (stmt.find(searchFrom)) {
             int end = statementEnd(commentMasked, stmt.end());
+            Section section = "blocks".equalsIgnoreCase(stmt.group(1)) ? Section.BLOCKS : Section.TEMPLATES;
             Matcher m = FILE_OR_TEMPLATE.matcher(commentMasked);
             m.region(stmt.end(), end);
             while (m.find()) {
                 if (seen.add(m.start(1))) {
-                    out.add(new Registration(m.group(1).replace('\\', '/'), m.start(1)));
+                    out.add(new Registration(m.group(1).replace('\\', '/'), m.start(1), section));
                 }
             }
             searchFrom = Math.max(end, stmt.end());
@@ -61,25 +70,36 @@ public final class XoopsManifestTemplates {
         return out;
     }
 
-    /**
-     * Lower-case lookup keys for every registration in {@code manifestText} (raw source).
-     * Each name is added as spelled, and also relative to {@code templates/} and to
-     * {@code blocks/}, so the XOOPS bare-name convention and module-root spellings both match.
-     */
+    /** Module-root-relative, lower-case disk paths, preserving block/page identity. */
     public static @NotNull Set<String> keys(@NotNull String manifestText) {
         Set<String> out = new LinkedHashSet<>();
         for (Registration r : find(PhpTextUtil.maskCommentsOnly(manifestText))) {
-            String key = r.name().toLowerCase(Locale.ROOT);
-            out.add(key);
-            if (key.startsWith("templates/")) {
-                key = key.substring("templates/".length());
-                out.add(key);
-            }
-            if (key.startsWith("blocks/")) {
-                out.add(key.substring("blocks/".length()));
-            }
+            out.add(diskPath(r.name(), r.block()).toLowerCase(Locale.ROOT));
         }
         return out;
+    }
+
+    /**
+     * Module-root-relative path where a missing registered file should be created.
+     * Bare block names go under {@code templates/blocks/}; already-prefixed names stay as spelled.
+     */
+    public static @NotNull String diskPath(@NotNull String name, boolean block) {
+        String n = name.replace('\\', '/');
+        while (n.startsWith("/")) {
+            n = n.substring(1);
+        }
+        if (n.startsWith("templates/") || n.startsWith("blocks/")) {
+            return n;
+        }
+        return block ? "templates/blocks/" + n : "templates/" + n;
+    }
+
+    /** Shortest registration spelling that still resolves to the same module-relative path. */
+    public static @NotNull String registrationName(@NotNull String relativePath) {
+        String normalized = relativePath.replace('\\', '/');
+        String candidate = normalized.startsWith("templates/")
+                ? normalized.substring("templates/".length()) : normalized;
+        return diskPath(candidate, false).equals(normalized) ? candidate : normalized;
     }
 
     /** Offset just past the {@code ;} that ends the statement, skipping {@code ;} inside quotes. */

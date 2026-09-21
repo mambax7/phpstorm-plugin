@@ -13,6 +13,30 @@ import static org.junit.Assert.assertTrue;
 
 public final class XoopsProjectScannerTest {
 
+
+    @Test
+    public void pageTemplateDoesNotSatisfyBlockRegistration() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-template-kind");
+        try {
+            Files.writeString(moduleRoot.resolve("xoops_version.php"),
+                    "<?php $modversion['blocks'][1]['template'] = 'shared.tpl';");
+            Files.createDirectories(moduleRoot.resolve("templates"));
+            Files.writeString(moduleRoot.resolve("templates/shared.tpl"), "page");
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.stream().anyMatch(f -> "MISSING_REGISTERED_TEMPLATE".equals(f.kind())));
+            assertTrue(findings.stream().anyMatch(f -> "UNREGISTERED_TEMPLATE".equals(f.kind())));
+            Files.createDirectories(moduleRoot.resolve("templates/blocks"));
+            Files.writeString(moduleRoot.resolve("templates/blocks/shared.tpl"), "block");
+            findings.clear();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertFalse(findings.stream().anyMatch(f -> "MISSING_REGISTERED_TEMPLATE".equals(f.kind())));
+            assertEquals(1, findings.stream().filter(f -> "UNREGISTERED_TEMPLATE".equals(f.kind())).count());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
     @Test
     public void versionPatternsPinTheDocumentedCoreLines() {
         assertTrue(XoopsProjectScanner.VERSION_25.matcher("XOOPS 2.5.11").find());
@@ -23,6 +47,23 @@ public final class XoopsProjectScannerTest {
         assertFalse(XoopsProjectScanner.VERSION_25.matcher("version 12.5").find());
         assertFalse(XoopsProjectScanner.VERSION_27.matcher("php: 12.7").find());
         assertFalse(XoopsProjectScanner.VERSION_40.matcher("build 14.0").find());
+    }
+
+    @Test
+    public void coreVersionSettingOverridesAutoDetection() {
+        assertEquals(CoreVersion.XOOPS_25, XoopsProjectScanner.coreVersionFromSetting("2.5"));
+        assertEquals(CoreVersion.XOOPS_27, XoopsProjectScanner.coreVersionFromSetting("2.7"));
+        assertEquals(CoreVersion.XOOPS_40, XoopsProjectScanner.coreVersionFromSetting("4.0"));
+        assertEquals(null, XoopsProjectScanner.coreVersionFromSetting("Auto"));
+        Path ignored = Path.of(".");
+        assertEquals(
+                CoreVersion.XOOPS_27,
+                XoopsProjectScanner.resolveScanCoreVersion("2.7", true, ignored, ignored)
+        );
+        assertEquals(
+                CoreVersion.MODULE_ONLY,
+                XoopsProjectScanner.resolveScanCoreVersion("Auto", true, ignored, ignored)
+        );
     }
 
     @Test

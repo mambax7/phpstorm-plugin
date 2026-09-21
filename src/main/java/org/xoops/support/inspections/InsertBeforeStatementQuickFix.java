@@ -59,7 +59,7 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
         if (XoopsResultSetGuardInspection.isFetchGuardedAt(text, fetchOffset, resultVar)) {
             return;
         }
-        if (assignsBeforeFetch(text.substring(insertAt, Math.max(insertAt, fetchOffset)))) {
+        if (assignsResultBeforeFetch(text, insertAt, Math.max(insertAt, fetchOffset), resultVar)) {
             // e.g. while (($result = $db->query($sql)) && $db->fetchRow($result)):
             // a guard above the statement would test a stale value. Leave it to the user.
             return;
@@ -91,9 +91,12 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
         }
     }
 
-    private boolean assignsBeforeFetch(@NotNull String statementPrefix) {
+    static boolean assignsResultBeforeFetch(
+            @NotNull String text, int from, int to, @NotNull String resultVar
+    ) {
+        String masked = PhpTextUtil.maskCommentsAndStrings(text).substring(from, to);
         return Pattern.compile(Pattern.quote(resultVar) + "(?![\\w])\\s*=(?![=>])")
-                .matcher(statementPrefix).find();
+                .matcher(masked).find();
     }
 
     private static String guessIndent(@NotNull String text, int offset) {

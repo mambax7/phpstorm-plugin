@@ -81,7 +81,28 @@ public final class PhpTextUtil {
         char[] chars = text.toCharArray();
         int i = 0;
         int n = chars.length;
+        // Snippets with no open tag (statement prefixes) are already PHP.
+        // Full files that contain a tag start outside PHP so HTML quotes cannot leak.
+        boolean inPhp = !containsPhpOpenTag(text);
         while (i < n) {
+            if (!inPhp) {
+                int tagLen = phpOpenTagLength(text, i);
+                if (tagLen > 0) {
+                    inPhp = true;
+                    i += tagLen;
+                    continue;
+                }
+                if (chars[i] != '\n' && chars[i] != '\r') {
+                    chars[i] = ' ';
+                }
+                i++;
+                continue;
+            }
+            if (i + 1 < n && chars[i] == '?' && chars[i + 1] == '>') {
+                inPhp = false;
+                i += 2;
+                continue;
+            }
             // Heredoc / nowdoc: <<<IDENT  <<<'IDENT'  <<<"IDENT"
             // Detected in both modes so // # /* inside the body are never comments;
             // characters are wiped only when strings are being masked.
@@ -158,14 +179,16 @@ public final class PhpTextUtil {
             }
             // // line comment
             if (i + 1 < n && chars[i] == '/' && chars[i + 1] == '/') {
-                while (i < n && chars[i] != '\n') {
+                while (i < n && chars[i] != '\n'
+                        && !(chars[i] == '?' && i + 1 < n && chars[i + 1] == '>')) {
                     chars[i++] = ' ';
                 }
                 continue;
             }
             // # line comment
             if (chars[i] == '#') {
-                while (i < n && chars[i] != '\n') {
+                while (i < n && chars[i] != '\n'
+                        && !(chars[i] == '?' && i + 1 < n && chars[i + 1] == '>')) {
                     chars[i++] = ' ';
                 }
                 continue;
@@ -235,6 +258,48 @@ public final class PhpTextUtil {
             i++;
         }
         return new String(chars);
+    }
+
+    private static boolean containsPhpOpenTag(@NotNull String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '<' && phpOpenTagLength(text, i) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Length of a PHP open tag at {@code i}, or 0. Recognizes {@code <?php}, {@code <?=},
+     * and short {@code <?} (not {@code <?xml}).
+     */
+    private static int phpOpenTagLength(@NotNull String text, int i) {
+        int n = text.length();
+        if (i + 1 >= n || text.charAt(i) != '<' || text.charAt(i + 1) != '?') {
+            return 0;
+        }
+        if (i + 2 < n && text.charAt(i + 2) == '=') {
+            return 3;
+        }
+        if (startsIgnoreCase(text, i, "<?php")) {
+            int after = i + 5;
+            if (after == n || !Character.isLetterOrDigit(text.charAt(after))) {
+                return 5;
+            }
+            return 0;
+        }
+        if (startsIgnoreCase(text, i, "<?xml")) {
+            return 0;
+        }
+        return 2;
+    }
+
+    private static boolean startsIgnoreCase(@NotNull String text, int i, @NotNull String prefix) {
+        int n = prefix.length();
+        if (i + n > text.length()) {
+            return false;
+        }
+        return text.regionMatches(true, i, prefix, 0, n);
     }
 
     /**

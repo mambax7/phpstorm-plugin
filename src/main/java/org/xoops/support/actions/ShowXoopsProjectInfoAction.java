@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import org.xoops.support.scanner.XoopsModuleInfo;
 import org.xoops.support.scanner.XoopsProjectReport;
 import org.xoops.support.scanner.XoopsProjectScanner;
+import org.xoops.support.settings.XoopsSettingsState;
 
 import java.nio.file.Path;
 
@@ -34,7 +35,10 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
                 XoopsProjectReport report;
                 try {
                     indicator.setText("Scanning XOOPS modules (cancellable)…");
-                    report = new XoopsProjectScanner().scan(Path.of(basePath));
+                    report = new XoopsProjectScanner().scan(
+                            Path.of(basePath),
+                            XoopsSettingsState.getInstance(project).resolvedCoreVersion()
+                    );
                 } catch (ProcessCanceledException pce) {
                     // Let the progress framework treat this as a user cancel, not a failure dialog.
                     throw pce;

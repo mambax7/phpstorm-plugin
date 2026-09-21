@@ -58,7 +58,7 @@ public final class XoopsDeprecatedUnicodeDtypeInspection extends LocalInspection
                         holder.registerProblem(
                                 leaf,
                                 "XOOPS: " + old + " is deprecated since 2.7.3; use " + next,
-                                new ReplacePsiTextQuickFix("Replace with " + next, next)
+                                new ReplacePsiTextQuickFix("Replace with " + next, next, old)
                         );
                     }
                 }

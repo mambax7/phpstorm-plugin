@@ -37,17 +37,15 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 String code = PhpTextUtil.maskCommentsOnly(text);
                 for (XoopsManifestTemplates.Registration reg : XoopsManifestTemplates.find(code)) {
                     String template = reg.name();
-                    boolean exists = childExists(moduleRoot, "templates/" + template)
-                            || childExists(moduleRoot, "templates/blocks/" + template)
-                            || childExists(moduleRoot, "blocks/" + template)
-                            || childExists(moduleRoot, template);
+                    boolean exists = childExists(moduleRoot,
+                            XoopsManifestTemplates.diskPath(template, reg.block()));
                     if (!exists) {
                         PsiElement leaf = PhpTextUtil.leafAt(file, reg.nameOffset());
                         if (leaf != null) {
                             holder.registerProblem(
                                     leaf,
                                     "XOOPS: registered template missing on disk: " + template,
-                                    new CreateMissingTemplateQuickFix(template)
+                                    new CreateMissingTemplateQuickFix(template, reg.block())
                             );
                         }
                     }

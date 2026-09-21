@@ -101,6 +101,32 @@ public final class XoopsRootPathGuardPolicyTest {
     }
 
     @Test
+    public void echoOpenTagAloneStillRequiresGuard() {
+        String source = "<?= $x ?>\n";
+        assertTrue(XoopsRootPathGuardPolicy.requiresGuard(
+                "C:/site/htdocs/modules/demo/include/view.php",
+                source
+        ));
+        assertEquals(-1, XoopsRootPathGuardPolicy.insertOffset(source));
+        assertTrue(XoopsRootPathGuardPolicy.canInsertGuard(source));
+    }
+
+    @Test
+    public void unmatchedHtmlApostropheDoesNotHidePhpBody() {
+        String source = """
+                <div class="don't">
+                <?php
+                class Demo {}
+                """;
+        assertTrue(XoopsRootPathGuardPolicy.requiresGuard(
+                "C:/site/htdocs/modules/demo/include/view.php",
+                source
+        ));
+        assertFalse(XoopsRootPathGuardPolicy.firstExecutable(source).isEmpty());
+        assertTrue(XoopsRootPathGuardPolicy.firstExecutable(source).contains("class Demo"));
+    }
+
+    @Test
     public void semicolonInsideQuotedHeaderIsStillAStub() {
         assertTrue(XoopsRootPathGuardPolicy.is404OrForbiddenStub(
                 "header('HTTP/1.1 403 Forbidden; denied');"

@@ -223,4 +223,23 @@ public final class XoopsResultSetGuardInspectionTest {
         int fetchAt = php.indexOf("fetchArray");
         assertTrue(XoopsResultSetGuardInspection.isFetchGuardedAt(php, fetchAt, "$result"));
     }
+
+    @Test
+    public void commentAssignmentDoesNotCountAsAssignBeforeFetch() {
+        for (String prefix : new String[]{"// $result = ignored\n$row = ",
+                "$log = '$result = ignored';\n$row = "}) {
+            assertFalse(InsertBeforeStatementQuickFix.assignsResultBeforeFetch(
+                    prefix, 0, prefix.length(), "$result"));
+        }
+        String prefix = "($result = $db->query($sql)) && ";
+        assertTrue(InsertBeforeStatementQuickFix.assignsResultBeforeFetch(
+                prefix, 0, prefix.length(), "$result"));
+    }
+
+    @Test
+    public void assignmentCheckMasksWholePhpDocumentBeforeSlicing() {
+        String source = "<?php log('<?php $result = ignored', $db->fetchArray($result));";
+        assertFalse(InsertBeforeStatementQuickFix.assignsResultBeforeFetch(
+                source, source.indexOf("log("), source.indexOf("$db->fetchArray"), "$result"));
+    }
 }
