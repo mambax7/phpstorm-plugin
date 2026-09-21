@@ -133,7 +133,7 @@ An early-exit guard covers later fetches of the same variable, including `while 
 **What counts as guarded.** The analysis is textual, so it follows a few explicit rules rather than full control flow:
 
 - A negative check that throws, returns or exits (`if (!$db->isResultSet($result)) { return; }`) covers every later fetch of `$result` in the same block. It stops covering at a reassignment of `$result`, at a nested `function`, or when the enclosing `}` closes.
-- A positive check (`if ($db->isResultSet($result)) { ... }`) covers fetches inside its body, brace-less body included.
+- A positive check (`if ($db->isResultSet($result)) { ... }`) covers fetches inside its body, brace-less body included. `||` and `xor` in a positive condition disqualify it: `if ($db->isResultSet($result) || $fallback)` can enter the body with `$result === false`, so the fetch inside is still reported. `||` is fine only in the terminating negative form above.
 - `$result = $db->fetchArray($result)` inside a guarded region stays guarded: the fetch reads the old value. `$result = false or $db->fetchArray($result)` does not, because `or` binds looser than `=` and the assignment completes first.
 - `&&`, `and` and `xor` in the guard condition disqualify it. `if (!isResultSet($r) && $x) return;` can fall through while `$r` is still `false`.
 - Comments and strings are masked first, so a commented-out guard never counts.

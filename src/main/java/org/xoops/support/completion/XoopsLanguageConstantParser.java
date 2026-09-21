@@ -35,8 +35,14 @@ public final class XoopsLanguageConstantParser {
         List<Occurrence> out = new ArrayList<>();
         // Comments masked, strings kept: a commented-out define() is not a definition,
         // and the mask preserves offsets so Ctrl+B still lands on the real name.
+        // The fully masked copy tells whether the define keyword itself sits in code:
+        // inside a string literal it is blanked there, so the occurrence is skipped.
+        String code = PhpTextUtil.maskCommentsAndStrings(phpSource);
         Matcher m = DEFINE.matcher(PhpTextUtil.maskCommentsOnly(phpSource));
         while (m.find()) {
+            if (code.charAt(m.start()) == ' ') {
+                continue;
+            }
             out.add(new Occurrence(m.group(1), m.start(1)));
         }
         return out;

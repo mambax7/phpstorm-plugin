@@ -49,8 +49,7 @@ public final class XoopsRootPathGuardPolicy {
 
     private static final Pattern BOOTSTRAP_INCLUDE = Pattern.compile(
             "(?i)^(?:include|include_once|require|require_once)\\b[^;]*"
-                    + "(?:mainfile\\.php|admin_header\\.php|admin_footer\\.php|cp_header\\.php|common\\.php"
-                    + "|(?<![A-Za-z_])header\\.php|(?<![A-Za-z_])footer\\.php)"
+                    + "(?<![\\w.-])(?:mainfile|admin_header|admin_footer|cp_header|common|header|footer)\\.php(?![\\w.-])"
     );
 
     private XoopsRootPathGuardPolicy() {

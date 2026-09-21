@@ -44,7 +44,9 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
                     return;
                 }
                 Set<String> registered = registeredTemplates(manifestPsi.getText());
-                if (registered.contains(relative.toLowerCase(Locale.ROOT))) {
+                String key = relative.toLowerCase(Locale.ROOT);
+                if (registered.contains(key)
+                        || (key.startsWith("blocks/") && registered.contains(key.substring("blocks/".length())))) {
                     return;
                 }
                 PsiElement anchor = file.getFirstChild() != null ? file.getFirstChild() : file;

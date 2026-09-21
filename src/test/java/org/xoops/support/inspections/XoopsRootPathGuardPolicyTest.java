@@ -116,6 +116,24 @@ public final class XoopsRootPathGuardPolicyTest {
     }
 
     @Test
+    public void lookalikeBootstrapNamesStillRequireGuard() {
+        for (String inc : new String[] {
+                "include 'custom-header.php';",
+                "require 'mainfile.php.bak';",
+                "include_once __DIR__ . '/xoops_header.php';",
+                "require_once 'headerless.php';"}) {
+            assertTrue(inc, XoopsRootPathGuardPolicy.requiresGuard(
+                    "C:/site/htdocs/modules/demo/include/common.php",
+                    "<?php\n" + inc + "\n"
+            ));
+        }
+        assertFalse(XoopsRootPathGuardPolicy.requiresGuard(
+                "C:/site/htdocs/modules/demo/include/common.php",
+                "<?php\nrequire_once dirname(__DIR__, 3) . '/mainfile.php';\n"
+        ));
+    }
+
+    @Test
     public void skipsAdminScripts() {
         assertFalse(XoopsRootPathGuardPolicy.requiresGuard(
                 "C:/site/htdocs/modules/wgsimpleacc/admin/about.php",

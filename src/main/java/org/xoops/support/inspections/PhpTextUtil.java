@@ -73,7 +73,7 @@ public final class PhpTextUtil {
      * Mask comments, quoted strings, and heredoc/nowdoc bodies with spaces so
      * regex matches keep the same offsets but cannot hit non-code.
      */
-    static @NotNull String maskCommentsAndStrings(@NotNull String text) {
+    public static @NotNull String maskCommentsAndStrings(@NotNull String text) {
         return maskInternal(text, true);
     }
 

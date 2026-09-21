@@ -37,6 +37,19 @@ public final class XoopsLanguageConstantParserTest {
     }
 
     @Test
+    public void parseIgnoresDefineInsideStringLiterals() {
+        String php = """
+                <?php
+                define('_MI_HELP', "Write define('_MI_FAKE', 'x') in modinfo.php");
+                define('_MI_REAL', 'y');
+                """;
+        List<XoopsLanguageConstantParser.Occurrence> occ = XoopsLanguageConstantParser.parse(php);
+        assertEquals(2, occ.size());
+        assertEquals("_MI_HELP", occ.get(0).name());
+        assertEquals("_MI_REAL", occ.get(1).name());
+    }
+
+    @Test
     public void parseIgnoresCommentedOutDefines() {
         String php = """
                 <?php
