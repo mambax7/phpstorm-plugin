@@ -35,9 +35,9 @@ public final class XoopsProjectScanner {
             "smarty_compile", "templates_c", "uploads", "vendor", "xoops_data"
     );
 
-    static final Pattern VERSION_25 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.5(?:\\.|[^0-9]|$)");
-    static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.7(?:\\.|[^0-9]|$)");
-    static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?4\\.0(?:\\.|[^0-9]|$)");
+    static final Pattern VERSION_25 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.5(?:[^0-9]|$)");
+    static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.7(?:[^0-9]|$)");
+    static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?4\\.0(?:[^0-9]|$)");
     static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
             "(?is)['\"](?:file|template)['\"]\\s*=>\\s*['\"]([^'\"]+\\.tpl)['\"]"
     );

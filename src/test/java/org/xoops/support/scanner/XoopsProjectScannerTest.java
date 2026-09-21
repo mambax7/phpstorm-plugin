@@ -92,7 +92,7 @@ public final class XoopsProjectScannerTest {
             return;
         }
         try (var walk = Files.walk(root)) {
-            walk.sorted((a, b) -> b.getNameCount() - a.getNameCount())
+            walk.sorted((a, b) -> Integer.compare(b.getNameCount(), a.getNameCount()))
                     .forEach(p -> {
                         try {
                             Files.deleteIfExists(p);

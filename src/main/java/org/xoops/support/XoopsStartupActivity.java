@@ -31,51 +31,51 @@ public final class XoopsStartupActivity implements ProjectActivity {
     }
 
     private void scheduleNotification(@NotNull Project project) {
-        if (project.isDisposed()) {
+        if (project.isDisposed() || !notificationsEnabled(project)) {
             return;
         }
-        XoopsSettingsState settings = XoopsSettingsState.getInstance(project);
-        if (!settings.enabled || settings.suppressStartupNotification) {
-            return;
-        }
-
         DumbService.getInstance(project).runWhenSmart(() -> {
             if (project.isDisposed()) {
                 return;
             }
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
-                if (project.isDisposed()) {
-                    return;
-                }
-                XoopsSettingsState current = XoopsSettingsState.getInstance(project);
-                if (!current.enabled || current.suppressStartupNotification) {
-                    return;
-                }
-                XoopsProjectService service = XoopsProjectService.getInstance(project);
-                if (!service.isXoopsProject()) {
-                    return;
-                }
-                int modules = service.findModuleDirnames().size();
-                ApplicationManager.getApplication().invokeLater(
-                        () -> {
-                            if (project.isDisposed()) {
-                                return;
-                            }
-                            NotificationGroupManager.getInstance()
-                                    .getNotificationGroup("XOOPS Support")
-                                    .createNotification(
-                                            "XOOPS Support active",
-                                            "Detected XOOPS markers (" + modules + " module(s) with xoops_version.php). "
-                                                    + "See Settings → Editor → Inspections → XOOPS, "
-                                                    + "and Tools → XOOPS Support.",
-                                            NotificationType.INFORMATION
-                                    )
-                                    .notify(project);
-                        },
-                        ModalityState.nonModal(),
-                        project.getDisposed()
-                );
-            });
+            ApplicationManager.getApplication().executeOnPooledThread(() -> notifyIfXoops(project));
         });
+    }
+
+    private static boolean notificationsEnabled(@NotNull Project project) {
+        XoopsSettingsState settings = XoopsSettingsState.getInstance(project);
+        return settings.enabled && !settings.suppressStartupNotification;
+    }
+
+    private static void notifyIfXoops(@NotNull Project project) {
+        if (project.isDisposed() || !notificationsEnabled(project)) {
+            return;
+        }
+        XoopsProjectService service = XoopsProjectService.getInstance(project);
+        if (!service.isXoopsProject()) {
+            return;
+        }
+        int modules = service.findModuleDirnames().size();
+        ApplicationManager.getApplication().invokeLater(
+                () -> showBalloon(project, modules),
+                ModalityState.nonModal(),
+                project.getDisposed()
+        );
+    }
+
+    private static void showBalloon(@NotNull Project project, int modules) {
+        if (project.isDisposed()) {
+            return;
+        }
+        NotificationGroupManager.getInstance()
+                .getNotificationGroup("XOOPS Support")
+                .createNotification(
+                        "XOOPS Support active",
+                        "Detected XOOPS markers (" + modules + " module(s) with xoops_version.php). "
+                                + "See Settings → Editor → Inspections → XOOPS, "
+                                + "and Tools → XOOPS Support.",
+                        NotificationType.INFORMATION
+                )
+                .notify(project);
     }
 }

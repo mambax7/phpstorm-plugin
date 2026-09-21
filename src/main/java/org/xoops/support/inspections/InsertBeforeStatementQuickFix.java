@@ -51,7 +51,8 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
             return;
         }
         String text = document.getText();
-        if (alreadyGuardedAbove(text, insertAt, resultVar)) {
+        int fetchOffset = leaf.getTextRange().getStartOffset();
+        if (XoopsResultSetGuardInspection.isFetchGuardedAt(text, fetchOffset, resultVar)) {
             return;
         }
         String indent = guessIndent(text, insertAt);
@@ -61,17 +62,6 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
                 + indent + "}\n";
         document.insertString(insertAt, block);
         PsiDocumentManager.getInstance(project).commitDocument(document);
-    }
-
-    /**
-     * True when the statement immediately above {@code insertAt} already throws/returns
-     * on {@code !isResultSet($var)}. Prevents a second insert if a stale duplicate finding
-     * is applied after the first fix in the same Inspect Code session.
-     */
-    static boolean alreadyGuardedAbove(@NotNull String text, int insertAt, @NotNull String resultVar) {
-        int from = Math.max(0, insertAt - 400);
-        String preceding = text.substring(from, insertAt);
-        return preceding.contains("isResultSet(" + resultVar + ")");
     }
 
     private static String guessIndent(@NotNull String text, int offset) {

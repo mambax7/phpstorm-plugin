@@ -32,35 +32,15 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
-                if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
-                    return;
-                }
-                String name = file.getName().toLowerCase(Locale.ROOT);
-                if (!name.endsWith(".tpl") || PhpTextUtil.looksLikeVendorOrCache(file)) {
-                    return;
-                }
-                VirtualFile vf = file.getVirtualFile();
+                VirtualFile vf = candidateTpl(file);
                 if (vf == null) {
                     return;
                 }
-                String path = vf.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
-                if (path.contains("/themes/") || path.contains("/templates_c/")) {
-                    return;
-                }
                 String relative = relativeTemplateName(vf);
-                if (relative == null) {
-                    return;
-                }
-                VirtualFile moduleRoot = moduleRootOf(vf);
-                if (moduleRoot == null) {
-                    return;
-                }
-                VirtualFile manifest = moduleRoot.findChild("xoops_version.php");
-                if (manifest == null) {
-                    return;
-                }
-                PsiFile manifestPsi = file.getManager().findFile(manifest);
-                if (manifestPsi == null) {
+                VirtualFile moduleRoot = relative == null ? null : moduleRootOf(vf);
+                VirtualFile manifest = moduleRoot == null ? null : moduleRoot.findChild("xoops_version.php");
+                PsiFile manifestPsi = manifest == null ? null : file.getManager().findFile(manifest);
+                if (relative == null || manifestPsi == null) {
                     return;
                 }
                 Set<String> registered = registeredTemplates(manifestPsi.getText());
@@ -75,6 +55,25 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
                 );
             }
         };
+    }
+
+    private static @Nullable VirtualFile candidateTpl(@NotNull PsiFile file) {
+        if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
+            return null;
+        }
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        if (!name.endsWith(".tpl") || PhpTextUtil.looksLikeVendorOrCache(file)) {
+            return null;
+        }
+        VirtualFile vf = file.getVirtualFile();
+        if (vf == null) {
+            return null;
+        }
+        String path = vf.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
+        if (path.contains("/themes/") || path.contains("/templates_c/")) {
+            return null;
+        }
+        return vf;
     }
 
     static @NotNull Set<String> registeredTemplates(@NotNull String manifestText) {

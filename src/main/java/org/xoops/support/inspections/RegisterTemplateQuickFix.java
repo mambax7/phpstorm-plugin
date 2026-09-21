@@ -10,6 +10,8 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Locale;
+
 /**
  * Appends a {@code $modversion['templates'][]} entry for the unregistered .tpl.
  */
@@ -55,8 +57,10 @@ public final class RegisterTemplateQuickFix implements LocalQuickFix {
             return;
         }
         String text = document.getText();
-        if (text.toLowerCase().contains("'" + templateName.toLowerCase() + "'")
-                || text.toLowerCase().contains("\"" + templateName.toLowerCase() + "\"")) {
+        String lowerText = text.toLowerCase(Locale.ROOT);
+        String lowerName = templateName.toLowerCase(Locale.ROOT);
+        if (lowerText.contains("'" + lowerName + "'")
+                || lowerText.contains("\"" + lowerName + "\"")) {
             return;
         }
         String entry = "\n$modversion['templates'][] = [\n"

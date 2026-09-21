@@ -41,7 +41,8 @@ public final class XoopsLanguageConstantParser {
 
     /**
      * Extract a XOOPS language-constant name from a PSI element's text
-     * (quoted string, bare identifier, or Smarty token).
+     * (quoted string, bare identifier, {@code $smarty.const._MI_FOO}, or Smarty token).
+     * Recognition is case-insensitive; the returned spelling is the original.
      */
     public static @Nullable String extractName(@NotNull String elementText) {
         String trimmed = elementText.strip();
@@ -52,8 +53,15 @@ public final class XoopsLanguageConstantParser {
                 trimmed = trimmed.substring(1, trimmed.length() - 1);
             }
         }
+        if (trimmed.startsWith("<{") && trimmed.endsWith("}>") && trimmed.length() > 4) {
+            trimmed = trimmed.substring(2, trimmed.length() - 2).strip();
+        }
         String upper = trimmed.toUpperCase(Locale.ROOT);
-        return CONSTANT_NAME.matcher(upper).matches() ? upper : null;
+        if (upper.startsWith("$SMARTY.CONST.")) {
+            trimmed = trimmed.substring("$SMARTY.CONST.".length());
+            upper = trimmed.toUpperCase(Locale.ROOT);
+        }
+        return CONSTANT_NAME.matcher(upper).matches() ? trimmed : null;
     }
 
     public static boolean isLanguagePath(@Nullable String path) {

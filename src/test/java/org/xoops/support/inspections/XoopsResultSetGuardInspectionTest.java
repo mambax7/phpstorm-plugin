@@ -77,13 +77,96 @@ public final class XoopsResultSetGuardInspectionTest {
     }
 
     @Test
-    public void alreadyGuardedAboveDetectsInsertedBlock() {
-        String preceding = """
-                    if (!$xoopsDB->isResultSet($result) || !$result instanceof \\mysqli_result) {
-                        throw new \\RuntimeException('Database query failed');
-                    }
+    public void reassignmentInsidePositiveGuardIsUnguarded() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if ($db->isResultSet($result)) {
+                    $result = $db->query($sql2);
+                    $row = $db->fetchArray($result);
+                }
                 """;
-        assertTrue(InsertBeforeStatementQuickFix.alreadyGuardedAbove(preceding, preceding.length(), "$result"));
-        assertFalse(InsertBeforeStatementQuickFix.alreadyGuardedAbove("while (true) {\n", 12, "$result"));
+        assertEquals(1, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).size());
+    }
+
+    @Test
+    public void fetchOnRightHandSideOfAssignmentIsStillGuarded() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if ($db->isResultSet($result)) {
+                    $result = $db->fetchArray($result);
+                }
+                """;
+        assertTrue(XoopsResultSetGuardInspection.unguardedFetchOffsets(php).isEmpty());
+    }
+
+    @Test
+    public void completedAssignmentBeforeFetchInSameStatementIsUnguarded() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if (!$db->isResultSet($result)) {
+                    return;
+                }
+                ($result = false) || $db->fetchArray($result);
+                """;
+        assertEquals(1, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).size());
+        int fetchAt = php.indexOf("fetchArray");
+        assertFalse(XoopsResultSetGuardInspection.isFetchGuardedAt(php, fetchAt, "$result"));
+    }
+
+    @Test
+    public void wordOrOperatorCompletesAssignmentBeforeFetch() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if (!$db->isResultSet($result)) {
+                    return;
+                }
+                $result = false or $db->fetchArray($result);
+                """;
+        assertEquals(1, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).size());
+    }
+
+    @Test
+    public void tightBindingOperatorsKeepFetchInsideAssignment() {
+        for (String op : new String[] {"?:", "??", "||", "&&"}) {
+            String php = """
+                    <?php
+                    $result = $db->query($sql);
+                    if ($db->isResultSet($result)) {
+                        $result = $a %s $db->fetchArray($result);
+                    }
+                    """.formatted(op);
+            assertTrue(op, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).isEmpty());
+        }
+    }
+
+    @Test
+    public void commentContainingIsResultSetDoesNotGuard() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                // if (!$db->isResultSet($result)) { return; }
+                $row = $db->fetchArray($result);
+                """;
+        assertEquals(1, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).size());
+        int fetchAt = php.indexOf("fetchArray");
+        assertFalse(XoopsResultSetGuardInspection.isFetchGuardedAt(php, fetchAt, "$result"));
+    }
+
+    @Test
+    public void earlyExitStillGuardsLaterFetch() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if (!$db->isResultSet($result)) {
+                    throw new \\RuntimeException('fail');
+                }
+                $row = $db->fetchArray($result);
+                """;
+        int fetchAt = php.indexOf("fetchArray");
+        assertTrue(XoopsResultSetGuardInspection.isFetchGuardedAt(php, fetchAt, "$result"));
     }
 }

@@ -75,6 +75,35 @@ public final class XoopsRootPathGuardPolicyTest {
     }
 
     @Test
+    public void responseCodePrefixWithMoreWorkIsNotAStub() {
+        String source = "<?php\nhttp_response_code(404) && doSensitiveWork();\n";
+        assertFalse(XoopsRootPathGuardPolicy.is404OrForbiddenStub(
+                XoopsRootPathGuardPolicy.firstExecutable(source)
+        ));
+        assertTrue(XoopsRootPathGuardPolicy.requiresGuard(
+                "C:/site/htdocs/modules/demo/class/Demo.php",
+                source
+        ));
+    }
+
+    @Test
+    public void htmlLeadingIncludeStillRequiresGuardButDeclinesInsert() {
+        String source = "<div><?php doSensitiveWork(); ?></div>\n";
+        assertTrue(XoopsRootPathGuardPolicy.requiresGuard(
+                "C:/site/htdocs/modules/demo/include/view.php",
+                source
+        ));
+        assertEquals(-1, XoopsRootPathGuardPolicy.insertOffset(source));
+    }
+
+    @Test
+    public void semicolonInsideQuotedHeaderIsStillAStub() {
+        assertTrue(XoopsRootPathGuardPolicy.is404OrForbiddenStub(
+                "header('HTTP/1.1 403 Forbidden; denied');"
+        ));
+    }
+
+    @Test
     public void skipsBootstrapEntryPoint() {
         assertFalse(XoopsRootPathGuardPolicy.requiresGuard(
                 "C:/site/htdocs/modules/wgsimpleacc/index.php",
@@ -114,5 +143,48 @@ public final class XoopsRootPathGuardPolicyTest {
         String source = "<?php\nclass Foo {}\n";
         int offset = XoopsRootPathGuardPolicy.insertOffset(source);
         assertEquals("class Foo {}\n", source.substring(offset));
+    }
+
+    @Test
+    public void shortOpenTagIsDetectedAndInsertsAfterNamespace() {
+        String source = "<?\nnamespace Example;\nuse Foo\\Bar;\nclass Demo {}\n";
+        assertTrue(XoopsRootPathGuardPolicy.requiresGuard(
+                "C:/site/htdocs/modules/demo/class/Demo.php",
+                source
+        ));
+        int offset = XoopsRootPathGuardPolicy.insertOffset(source);
+        assertTrue(offset > 0);
+        String before = source.substring(0, offset);
+        assertTrue(before.contains("namespace Example;"));
+        assertFalse(before.contains("namespace Example;\nuse"));
+        assertTrue(source.substring(offset).stripLeading().startsWith("use Foo"));
+    }
+
+    @Test
+    public void multipleDeclareStatementsAreSkipped() {
+        String source = """
+                <?php
+                declare(strict_types=1);
+                declare(ticks=1);
+                namespace Foo;
+                class Bar {}
+                """;
+        int offset = XoopsRootPathGuardPolicy.insertOffset(source);
+        assertTrue(source.substring(0, offset).contains("declare(ticks=1);"));
+        assertTrue(source.substring(0, offset).contains("namespace Foo;"));
+        assertTrue(source.substring(offset).stripLeading().startsWith("class Bar"));
+    }
+
+    @Test
+    public void braceNamespaceInsertsAfterOpeningBrace() {
+        String source = """
+                <?php
+                namespace Example {
+                class Demo {}
+                }
+                """;
+        int offset = XoopsRootPathGuardPolicy.insertOffset(source);
+        assertTrue(source.substring(0, offset).contains("namespace Example {"));
+        assertTrue(source.substring(offset).stripLeading().startsWith("class Demo"));
     }
 }

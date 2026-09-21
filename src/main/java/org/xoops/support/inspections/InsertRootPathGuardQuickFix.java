@@ -20,11 +20,6 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
 
     private static final String GUARD = "defined('XOOPS_ROOT_PATH') || exit('Restricted access');\n";
     private static final Pattern OPEN_ECHO = Pattern.compile("<\\?=", Pattern.CASE_INSENSITIVE);
-    /** Short open tag: {@code <?} not followed by php, =, or xml (avoid XML prologs). */
-    private static final Pattern OPEN_SHORT = Pattern.compile(
-            "<\\?(?!php|=|xml\\b)",
-            Pattern.CASE_INSENSITIVE
-    );
 
     @Override
     public @NotNull String getFamilyName() {
@@ -56,12 +51,6 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             return;
         }
 
-        Matcher shortTag = OPEN_SHORT.matcher(text);
-        if (shortTag.find() && isLeadingTag(text, shortTag.start())) {
-            insertGuardAt(document, project, shortTag.end());
-            return;
-        }
-
         Matcher echo = OPEN_ECHO.matcher(text);
         if (echo.find() && isLeadingTag(text, echo.start())) {
             document.insertString(echo.start(), "<?php\n" + GUARD + "?>\n");
@@ -85,7 +74,7 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             @NotNull Project project,
             int offset
     ) {
-        int insertAt = Math.max(0, Math.min(offset, document.getTextLength()));
+        int insertAt = Math.clamp(offset, 0, document.getTextLength());
         CharSequence seq = document.getCharsSequence();
         String prefix = insertAt == 0 ? "" : String.valueOf(seq.charAt(insertAt - 1));
         String toInsert = GUARD;

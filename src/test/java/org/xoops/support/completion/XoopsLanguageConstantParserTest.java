@@ -37,6 +37,27 @@ public final class XoopsLanguageConstantParserTest {
     }
 
     @Test
+    public void parsePreservesDistinctSpellings() {
+        String php = """
+                <?php
+                define('_mi_foo', 'a');
+                define('_MI_FOO', 'b');
+                """;
+        List<XoopsLanguageConstantParser.Occurrence> occ = XoopsLanguageConstantParser.parse(php);
+        assertEquals(2, occ.size());
+        assertEquals("_mi_foo", occ.get(0).name());
+        assertEquals("_MI_FOO", occ.get(1).name());
+    }
+
+    @Test
+    public void extractNamePreservesSpellingAndSmartyConst() {
+        assertEquals("_mi_foo", XoopsLanguageConstantParser.extractName("_mi_foo"));
+        assertEquals("_MI_FOO", XoopsLanguageConstantParser.extractName("$smarty.const._MI_FOO"));
+        assertEquals("_MI_FOO", XoopsLanguageConstantParser.extractName("<{$smarty.const._MI_FOO}>"));
+        assertNull(XoopsLanguageConstantParser.extractName("'customer.const._MI_FOO'"));
+    }
+
+    @Test
     public void languagePathFilter() {
         assertTrue(XoopsLanguageConstantParser.isLanguagePath("C:/m/language/english/search.php"));
         assertTrue(XoopsLanguageConstantParser.isLanguagePath("/modules/news/language/german/mail.php"));

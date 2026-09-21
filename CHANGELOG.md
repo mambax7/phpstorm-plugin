@@ -13,6 +13,12 @@ and this project uses [Semantic Versioning](https://semver.org/) with pre-releas
 - Replaced deprecated `StartupActivity` with `ProjectActivity`.
 - `FilenameIndex.getVirtualFilesByName` now passes `Project` (the two-arg overload is deprecated).
 - Marketplace Plugin Verifier **Critical** on IntelliJ IDEA is the missing `com.jetbrains.php` plugin in IU, not a PhpStorm incompatibility — verify against PhpStorm.
+- Persist Alpha 2 `coreProfile` into `coreVersion` (legacy-only XML keeps 2.5/2.7/4.0; explicit new `Auto` is not overwritten).
+- Batch isResultSet quick-fix reuses inspection analysis at the fetch offset; reassignment inside a positive `if` is unguarded.
+- ROOT_PATH open-tag handling is shared (`<?php` and `<?`); short-tag insert-after-`<?` fallback removed.
+- Language-constant index keeps original spelling; resolution is exact-case (name recognition stays case-insensitive). Only a `$smarty.const.` prefix is stripped.
+- isResultSet reassignment ends at `;`, `,`, an unmatched closer, or `or`/`and`/`xor`; `?:`, `??`, `||`, `&&` keep the fetch inside the assignment.
+- ROOT_PATH guard is still required for includes that start with HTML (quick-fix declines without a file-leading open tag); stub detection ignores `;` inside quotes.
 
 ## [1.0.0-alpha.3] — 1.0.0 Alpha 3 — 2026-09-02
 
@@ -30,7 +36,7 @@ and this project uses [Semantic Versioning](https://semver.org/) with pre-releas
 - Ctrl+B / Find Usages on `_MI_` / `_AM_` / `_MD_` / `_CO_` / `_MB_` constants (resolves to `define()` in `language/english/` when present).
 - Inspection: `.tpl` on disk under `templates/` or `blocks/` not listed in `xoops_version.php` (inverse of missing registered template), with a register-in-manifest quick-fix.
 - Inspection: `XOBJ_DTYPE_UNICODE_*` deprecated since 2.7.3, rename quick-fix to the non-UNICODE successor (silent when Core Version is 2.5).
-- JUnit 5 analyzer / policy / scanner / plugin.xml tests.
+- JUnit 4 analyzer / policy / scanner / plugin.xml tests.
 
 ### Changed
 

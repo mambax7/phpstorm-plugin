@@ -83,7 +83,7 @@ public final class XoopsConfigurable implements Configurable {
     public boolean isModified() {
         XoopsSettingsState s = XoopsSettingsState.getInstance(project);
         String selectedCoreVersion = String.valueOf(coreVersionBox.getSelectedItem());
-        String storedCoreVersion = s.coreVersion == null ? "Auto" : s.coreVersion;
+        String storedCoreVersion = s.resolvedCoreVersion();
         String storedPrefix = s.tablePrefix == null ? "" : s.tablePrefix;
         return enabledBox.isSelected() != s.enabled
                 || suppressNotifyBox.isSelected() != s.suppressStartupNotification
@@ -108,7 +108,7 @@ public final class XoopsConfigurable implements Configurable {
         enabledBox.setSelected(s.enabled);
         suppressNotifyBox.setSelected(s.suppressStartupNotification);
         autoScanBox.setSelected(s.autoScanOnToolWindowOpen);
-        coreVersionBox.setSelectedItem(s.coreVersion == null ? "Auto" : s.coreVersion);
+        coreVersionBox.setSelectedItem(s.resolvedCoreVersion());
         prefixField.setText(s.tablePrefix == null ? "" : s.tablePrefix);
     }
 }

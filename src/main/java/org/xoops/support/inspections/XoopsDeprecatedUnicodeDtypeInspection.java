@@ -44,8 +44,7 @@ public final class XoopsDeprecatedUnicodeDtypeInspection extends LocalInspection
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {
                     return;
                 }
-                String coreVersion = XoopsSettingsState.getInstance(file.getProject()).coreVersion;
-                if ("2.5".equals(coreVersion)) {
+                if ("2.5".equals(XoopsSettingsState.getInstance(file.getProject()).resolvedCoreVersion())) {
                     return;
                 }
                 String text = file.getText();
@@ -54,18 +53,14 @@ public final class XoopsDeprecatedUnicodeDtypeInspection extends LocalInspection
                 while (m.find()) {
                     String old = m.group(1);
                     String next = SUCCESSOR.get(old);
-                    if (next == null) {
-                        continue;
+                    PsiElement leaf = next == null ? null : PhpTextUtil.leafAt(file, m.start(1));
+                    if (next != null && leaf != null) {
+                        holder.registerProblem(
+                                leaf,
+                                "XOOPS: " + old + " is deprecated since 2.7.3; use " + next,
+                                new ReplacePsiTextQuickFix("Replace with " + next, next)
+                        );
                     }
-                    PsiElement leaf = PhpTextUtil.leafAt(file, m.start(1));
-                    if (leaf == null) {
-                        continue;
-                    }
-                    holder.registerProblem(
-                            leaf,
-                            "XOOPS: " + old + " is deprecated since 2.7.3; use " + next,
-                            new ReplacePsiTextQuickFix("Replace with " + next, next)
-                    );
                 }
             }
         };

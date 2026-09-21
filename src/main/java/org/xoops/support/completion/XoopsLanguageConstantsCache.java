@@ -102,6 +102,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
 
     /**
      * PSI element of the {@code define('_FOO_'} name in a language file (prefers {@code /english/}).
+     * Exact spelling only: {@code _MI_FOO} does not resolve to {@code define('_mi_foo')}.
      */
     public @Nullable PsiElement resolve(@NotNull String name) {
         Index index = getIndex();

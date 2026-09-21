@@ -1,5 +1,6 @@
 package org.xoops.support.completion;
 
+import com.intellij.lang.Language;
 import com.intellij.patterns.PlatformPatterns;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiReference;
@@ -37,6 +38,13 @@ public final class XoopsLanguageConstantReferenceContributor extends PsiReferenc
         };
         registrar.registerReferenceProvider(PlatformPatterns.psiElement(StringLiteralExpression.class), provider);
         registrar.registerReferenceProvider(PlatformPatterns.psiElement(ConstantReference.class), provider);
+        Language smarty = Language.findLanguageByID("Smarty");
+        if (smarty != null) {
+            registrar.registerReferenceProvider(
+                    PlatformPatterns.psiElement().withLanguage(smarty),
+                    provider
+            );
+        }
     }
 
     private static String nameOf(@NotNull PsiElement element) {
@@ -47,7 +55,8 @@ public final class XoopsLanguageConstantReferenceContributor extends PsiReferenc
             String n = constantReference.getName();
             return n == null ? null : XoopsLanguageConstantParser.extractName(n);
         }
-        // Smarty tokens and other leaves: only if the whole text is the constant.
+        // Smarty (and any other host): only leaves. A parent whose text is
+        // <{$smarty.const._MI_FOO}> would otherwise double-count with the leaf.
         if (element.getChildren().length == 0) {
             return XoopsLanguageConstantParser.extractName(element.getText());
         }

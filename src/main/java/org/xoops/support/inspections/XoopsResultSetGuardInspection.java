@@ -112,44 +112,66 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         };
     }
 
+    /**
+     * True when {@code fetchOffset} in {@code text} is already proven-safe for {@code resultVar}.
+     * Used by the batch quick-fix on the current document (not a raw substring window).
+     */
+    static boolean isFetchGuardedAt(@NotNull String text, int fetchOffset, @NotNull String resultVar) {
+        String code = PhpTextUtil.maskCommentsAndStrings(text);
+        if (fetchOffset < 0 || fetchOffset >= code.length()) {
+            return false;
+        }
+        return isFetchAlreadyGuarded(code, fetchOffset, resultVar, findIfConditions(code));
+    }
+
     private static boolean isFetchAlreadyGuarded(
             @NotNull String code,
             int fetchOffset,
             @NotNull String resultVar,
             @NotNull List<IfCond> allIfs
     ) {
+        List<IfCond> before = ifsBefore(allIfs, fetchOffset);
+        if (before.isEmpty()) {
+            return false;
+        }
+        if (isInsidePositiveIsResultSetGuard(code, fetchOffset, resultVar, before)) {
+            return true;
+        }
+        return hasDominatingEarlyExit(code, fetchOffset, resultVar, before);
+    }
+
+    private static @NotNull List<IfCond> ifsBefore(@NotNull List<IfCond> allIfs, int fetchOffset) {
         List<IfCond> before = new ArrayList<>();
         for (IfCond ic : allIfs) {
             if (ic.ifStart < fetchOffset) {
                 before.add(ic);
             }
         }
-        if (before.isEmpty()) {
-            return false;
-        }
+        return before;
+    }
 
-        if (isInsidePositiveIsResultSetGuard(code, fetchOffset, resultVar, before)) {
-            return true;
-        }
-
-        // Dominating early-exit: a proven !isResultSet($var) throw/return covers later
-        // fetch* of $var (including while/for conditions) until $var is reassigned,
-        // a nested function appears, or a '}' closes the enclosing block.
+    /**
+     * Dominating early-exit: a proven {@code !isResultSet($var)} throw/return covers later
+     * fetch* of {@code $var} until reassignment, a nested function, or a closing {@code }}.
+     */
+    private static boolean hasDominatingEarlyExit(
+            @NotNull String code,
+            int fetchOffset,
+            @NotNull String resultVar,
+            @NotNull List<IfCond> before
+    ) {
         for (int i = before.size() - 1; i >= 0; i--) {
             IfCond ic = before.get(i);
             if (ic.ifEnd > fetchOffset) {
                 continue;
             }
-            if (!isSafeEarlyExitCondition(ic.condition, resultVar) || !bodyIsSimpleEarlyExit(code, ic)) {
-                continue;
+            if (isSafeEarlyExitCondition(ic.condition, resultVar)
+                    && bodyIsSimpleEarlyExit(code, ic)
+                    && !assignsResultVar(code, ic.ifEnd, fetchOffset, resultVar)
+                    && !closesOutOfScope(code, ic.ifEnd, fetchOffset)
+                    && !hasFunctionKeyword(code, ic.ifEnd, fetchOffset)) {
+                return true;
             }
-            if (assignsResultVar(code, ic.ifEnd, fetchOffset, resultVar)) {
-                continue;
-            }
-            if (closesOutOfScope(code, ic.ifEnd, fetchOffset) || hasFunctionKeyword(code, ic.ifEnd, fetchOffset)) {
-                continue;
-            }
-            return true;
         }
         return false;
     }
@@ -181,10 +203,60 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         Matcher m = assign.matcher(code);
         while (m.find()) {
             if (m.start() >= from && m.start() < to) {
-                return true;
+                if (assignmentRhsEnd(code, m.start()) <= to) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    /**
+     * End offset of the right-hand side of the assignment starting at {@code assignStart}
+     * (the {@code $} of {@code $var = …}): the first {@code ;} or {@code ,} at depth 0,
+     * an unmatched closer, or a depth-0 {@code or} / {@code and} / {@code xor}, which bind
+     * looser than {@code =}. {@code ?:}, {@code ??}, {@code ||}, {@code &&} bind tighter,
+     * so they stay inside the right-hand side. A fetch inside that range reads the old value;
+     * a fetch after it ({@code ($r = false) || fetch($r)}, {@code $r = false or fetch($r)})
+     * sees the new value.
+     */
+    private static int assignmentRhsEnd(@NotNull String code, int assignStart) {
+        int depth = 0;
+        for (int i = assignStart; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (c == '(' || c == '[' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == ']' || c == '}') {
+                if (depth == 0) {
+                    return i;
+                }
+                depth--;
+            } else if (depth == 0 && (c == ';' || c == ',')) {
+                return i;
+            } else if (depth == 0 && startsWordOperator(code, i)) {
+                return i;
+            }
+        }
+        return code.length();
+    }
+
+    private static final Pattern WORD_OPERATOR = Pattern.compile("(?i)(?:or|and|xor)\\b");
+
+    /** True when a PHP {@code or} / {@code and} / {@code xor} keyword starts at {@code i}. */
+    private static boolean startsWordOperator(@NotNull String code, int i) {
+        char c = Character.toLowerCase(code.charAt(i));
+        if (c != 'o' && c != 'a' && c != 'x') {
+            return false;
+        }
+        if (i > 0) {
+            char prev = code.charAt(i - 1);
+            if (Character.isLetterOrDigit(prev) || prev == '_' || prev == '$') {
+                return false;
+            }
+        }
+        Matcher m = WORD_OPERATOR.matcher(code);
+        m.region(i, Math.min(code.length(), i + 4));
+        return m.lookingAt();
     }
 
     private static boolean closesOutOfScope(@NotNull String code, int from, int to) {
@@ -438,11 +510,10 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     }
                 }
                 if (depth > 0) {
-                    return true;
+                    return !assignsResultVar(code, ic.openBrace + 1, fetchOffset, resultVar);
                 }
             } else if (fetchOffset > ic.condEnd && fetchOffset < ic.ifEnd) {
-                // Brace-less: if (isResultSet($r)) $row = $db->fetch...;
-                return true;
+                return !assignsResultVar(code, ic.condEnd + 1, fetchOffset, resultVar);
             }
         }
         return false;
