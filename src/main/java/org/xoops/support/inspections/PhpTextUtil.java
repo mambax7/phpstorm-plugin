@@ -83,17 +83,17 @@ public final class PhpTextUtil {
         int n = chars.length;
         while (i < n) {
             // Heredoc / nowdoc: <<<IDENT  <<<'IDENT'  <<<"IDENT"
-            if (maskStrings && i + 3 < n && chars[i] == '<' && chars[i + 1] == '<' && chars[i + 2] == '<') {
+            // Detected in both modes so // # /* inside the body are never comments;
+            // characters are wiped only when strings are being masked.
+            if (i + 3 < n && chars[i] == '<' && chars[i + 1] == '<' && chars[i + 2] == '<') {
                 int start = i;
                 i += 3;
                 while (i < n && (chars[i] == ' ' || chars[i] == '\t')) {
                     i++;
                 }
-                boolean nowdoc = false;
                 boolean quoted = false;
                 char quote = 0;
                 if (i < n && (chars[i] == '\'' || chars[i] == '"')) {
-                    nowdoc = chars[i] == '\'';
                     quoted = true;
                     quote = chars[i];
                     i++;
@@ -111,25 +111,28 @@ public final class PhpTextUtil {
                 if (quoted && i < n && chars[i] == quote) {
                     i++;
                 }
-                // mask declaration through end of line
-                while (start < i) {
-                    chars[start++] = ' ';
+                // declaration through end of line
+                if (maskStrings) {
+                    for (int k = start; k < i; k++) {
+                        chars[k] = ' ';
+                    }
                 }
                 while (i < n && chars[i] != '\n') {
-                    chars[i++] = ' ';
+                    if (maskStrings) {
+                        chars[i] = ' ';
+                    }
+                    i++;
                 }
-                if (i < n && chars[i] == '\n') {
-                    chars[i++] = ' ';
+                if (i < n) {
+                    i++; // newline
                 }
-                // body until a line that is only IDENT or IDENT;
+                // body until a line that is only IDENT or IDENT followed by a non-word char
                 while (i < n) {
                     int lineStart = i;
                     while (i < n && chars[i] != '\n') {
                         i++;
                     }
-                    String line = text.substring(lineStart, i);
-                    String body = line.stripTrailing().stripLeading();
-                    // Closer: IDENT at start of line; following token may be ; ) , etc., but not more word chars.
+                    String body = text.substring(lineStart, i).strip();
                     boolean closer = false;
                     if (body.startsWith(ident)) {
                         if (body.length() == ident.length()) {
@@ -139,11 +142,13 @@ public final class PhpTextUtil {
                             closer = !Character.isLetterOrDigit(next) && next != '_';
                         }
                     }
-                    for (int k = lineStart; k < i; k++) {
-                        chars[k] = ' ';
+                    if (maskStrings) {
+                        for (int k = lineStart; k < i; k++) {
+                            chars[k] = ' ';
+                        }
                     }
-                    if (i < n && chars[i] == '\n') {
-                        chars[i++] = ' ';
+                    if (i < n) {
+                        i++; // newline
                     }
                     if (closer) {
                         break;

@@ -72,7 +72,7 @@ public final class XoopsLanguageConstantParser {
             return false;
         }
         String p = path.replace('\\', '/').toLowerCase(Locale.ROOT);
-        return p.contains("/language/")
+        return (p.contains("/language/") || p.endsWith("/language"))
                 && (p.endsWith(".php") || p.endsWith("/language") || !p.contains("."));
     }
 

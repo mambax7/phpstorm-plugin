@@ -91,5 +91,8 @@ public final class XoopsLanguageConstantParserTest {
         assertTrue(XoopsLanguageConstantParser.isLanguagePath("C:/m/language/english/search.php"));
         assertTrue(XoopsLanguageConstantParser.isLanguagePath("/modules/news/language/german/mail.php"));
         assertFalse(XoopsLanguageConstantParser.isLanguagePath("/modules/news/class/Item.php"));
+        // The directory itself (VFS move/rename event) must invalidate the cache too.
+        assertTrue(XoopsLanguageConstantParser.isLanguagePath("/modules/news/language"));
+        assertTrue(XoopsLanguageConstantParser.isLanguagePath("C:\\m\\language"));
     }
 }
