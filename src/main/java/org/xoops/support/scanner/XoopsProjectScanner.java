@@ -3,6 +3,7 @@ package org.xoops.support.scanner;
 import com.intellij.openapi.progress.ProgressManager;
 import org.jetbrains.annotations.NotNull;
 import org.xoops.support.inspections.PhpTextUtil;
+import org.xoops.support.inspections.XoopsManifestTemplates;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,12 +37,9 @@ public final class XoopsProjectScanner {
             "smarty_compile", "templates_c", "uploads", "vendor", "xoops_data"
     );
 
-    static final Pattern VERSION_25 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.5(?:[^0-9]|$)");
-    static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.7(?:[^0-9]|$)");
-    static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?4\\.0(?:[^0-9]|$)");
-    static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
-            "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
-    );
+    static final Pattern VERSION_25 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?(?<!\\d)2\\.5(?:[^0-9]|$)");
+    static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?(?<!\\d)2\\.7(?:[^0-9]|$)");
+    static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?(?<!\\d)4\\.0(?:[^0-9]|$)");
     private static final Pattern MANIFEST_DIRNAME = Pattern.compile(
             "(?is)(?:\\[['\"]dirname['\"]]\\s*=|['\"]dirname['\"]\\s*=>)\\s*['\"]([a-z0-9_-]+)['\"]"
     );
@@ -331,9 +329,9 @@ public final class XoopsProjectScanner {
         Set<String> registered = new LinkedHashSet<>();
         if (!content.isEmpty()) {
             // Masked copy keeps offsets, so lineAt() on the original content stays right.
-            Matcher matcher = REGISTERED_TEMPLATE.matcher(PhpTextUtil.maskCommentsOnly(content));
-            while (matcher.find()) {
-                String template = matcher.group(1).replace('\\', '/');
+            for (XoopsManifestTemplates.Registration reg
+                    : XoopsManifestTemplates.find(PhpTextUtil.maskCommentsOnly(content))) {
+                String template = reg.name();
                 String key = template.toLowerCase(Locale.ROOT);
                 registered.add(key);
                 // A manifest may spell the path from the module root; the walk keys are
@@ -353,7 +351,7 @@ public final class XoopsProjectScanner {
                     findings.add(new XoopsFinding(
                             "MISSING_REGISTERED_TEMPLATE",
                             manifest,
-                            lineAt(content, matcher.start(1)),
+                            lineAt(content, reg.nameOffset()),
                             "Registered template is missing: " + template
                     ));
                 }

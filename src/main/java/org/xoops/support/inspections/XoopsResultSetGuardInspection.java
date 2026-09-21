@@ -162,7 +162,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
     ) {
         for (int i = before.size() - 1; i >= 0; i--) {
             IfCond ic = before.get(i);
-            if (ic.ifEnd > fetchOffset) {
+            if (ic.ifEnd > fetchOffset || ic.chained) {
+                // An elseif / else-if branch is skipped whenever an earlier branch matched,
+                // so its early exit proves nothing about the fall-through path.
                 continue;
             }
             if (isSafeEarlyExitCondition(ic.condition, resultVar)
@@ -312,7 +314,8 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                 int semi = text.indexOf(';', after);
                 ifEnd = semi < 0 ? text.length() : semi + 1;
             }
-            out.add(new IfCond(m.start(), openParen, closeParen, openBrace, bodyStart, ifEnd, cond));
+            boolean chained = m.group().regionMatches(true, 0, "else", 0, 4);
+            out.add(new IfCond(m.start(), openParen, closeParen, openBrace, bodyStart, ifEnd, cond, chained));
         }
         return out;
     }
@@ -539,7 +542,8 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             int openBrace,
             int bodyStart,
             int ifEnd,
-            @NotNull String condition
+            @NotNull String condition,
+            boolean chained
     ) {
     }
 }

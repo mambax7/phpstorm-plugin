@@ -105,6 +105,14 @@ public final class XoopsLanguageConstantsCache implements Disposable {
      * Exact spelling only: {@code _MI_FOO} does not resolve to {@code define('_mi_foo')}.
      */
     public @Nullable PsiElement resolve(@NotNull String name) {
+        return resolve(name, null);
+    }
+
+    /**
+     * Same as {@link #resolve(String)}, preferring a definition in the same module as
+     * {@code from} (the {@code /modules/<dirname>/} segment) when several modules define the name.
+     */
+    public @Nullable PsiElement resolve(@NotNull String name, @Nullable VirtualFile from) {
         Index index = getIndex();
         if (index == null) {
             return null;
@@ -113,14 +121,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
         if (defs == null || defs.isEmpty()) {
             return null;
         }
-        Def chosen = defs.get(0);
-        for (Def d : defs) {
-            String path = d.file.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
-            if (path.contains("/english/")) {
-                chosen = d;
-                break;
-            }
-        }
+        Def chosen = pickDefinition(defs, from == null ? null : moduleSegment(from.getPath()));
         if (project.isDisposed()) {
             return null;
         }
@@ -189,6 +190,38 @@ public final class XoopsLanguageConstantsCache implements Disposable {
             }
         }
         return new Index(Collections.unmodifiableSet(names), Map.copyOf(defs));
+    }
+
+    /** Same module and /english/ first, then same module, then any /english/, then the first. */
+    static @NotNull Def pickDefinition(@NotNull List<Def> defs, @Nullable String moduleSegment) {
+        Def sameModule = null;
+        Def english = null;
+        for (Def d : defs) {
+            String path = d.file.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
+            boolean inModule = moduleSegment != null && path.contains(moduleSegment);
+            boolean isEnglish = path.contains("/english/");
+            if (inModule && isEnglish) {
+                return d;
+            }
+            if (inModule && sameModule == null) {
+                sameModule = d;
+            }
+            if (isEnglish && english == null) {
+                english = d;
+            }
+        }
+        return sameModule != null ? sameModule : (english != null ? english : defs.get(0));
+    }
+
+    /** {@code /modules/<dirname>/} of a path, lower-case, or null when not under modules/. */
+    static @Nullable String moduleSegment(@NotNull String path) {
+        String p = path.replace('\\', '/').toLowerCase(Locale.ROOT);
+        int i = p.indexOf("/modules/");
+        if (i < 0) {
+            return null;
+        }
+        int end = p.indexOf('/', i + "/modules/".length());
+        return end < 0 ? null : p.substring(i, end + 1);
     }
 
     private record Def(@NotNull VirtualFile file, int offset) {

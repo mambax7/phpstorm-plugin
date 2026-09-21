@@ -2,6 +2,7 @@ package org.xoops.support.completion;
 
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReferenceBase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,7 +31,9 @@ public final class XoopsLanguageConstantReference extends PsiReferenceBase<PsiEl
 
     @Override
     public @Nullable PsiElement resolve() {
-        return XoopsLanguageConstantsCache.getInstance(getElement().getProject()).resolve(name);
+        PsiFile file = getElement().getContainingFile();
+        return XoopsLanguageConstantsCache.getInstance(getElement().getProject())
+                .resolve(name, file == null ? null : file.getVirtualFile());
     }
 
     @Override

@@ -100,6 +100,13 @@ public final class XoopsLanguageConstantParserTest {
     }
 
     @Test
+    public void moduleSegmentIsExtracted() {
+        assertEquals("/modules/news/",
+                org.xoops.support.completion.XoopsLanguageConstantsCache.moduleSegment("C:/site/htdocs/modules/News/language/english/main.php"));
+        assertNull(org.xoops.support.completion.XoopsLanguageConstantsCache.moduleSegment("C:/site/htdocs/class/Foo.php"));
+    }
+
+    @Test
     public void languagePathFilter() {
         assertTrue(XoopsLanguageConstantParser.isLanguagePath("C:/m/language/english/search.php"));
         assertTrue(XoopsLanguageConstantParser.isLanguagePath("/modules/news/language/german/mail.php"));

@@ -9,6 +9,8 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.php.lang.psi.elements.GroupStatement;
 import com.jetbrains.php.lang.psi.elements.Statement;
+
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -57,6 +59,11 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
         if (XoopsResultSetGuardInspection.isFetchGuardedAt(text, fetchOffset, resultVar)) {
             return;
         }
+        if (assignsBeforeFetch(text.substring(insertAt, Math.max(insertAt, fetchOffset)))) {
+            // e.g. while (($result = $db->query($sql)) && $db->fetchRow($result)):
+            // a guard above the statement would test a stale value. Leave it to the user.
+            return;
+        }
         String indent = guessIndent(text, insertAt);
         String block = indent + "if (!" + dbExpr + "->isResultSet(" + resultVar
                 + ") || !" + resultVar + " instanceof \\mysqli_result) {\n"
@@ -82,6 +89,11 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
             }
             current = up;
         }
+    }
+
+    private boolean assignsBeforeFetch(@NotNull String statementPrefix) {
+        return Pattern.compile(Pattern.quote(resultVar) + "(?![\\w])\\s*=(?![=>])")
+                .matcher(statementPrefix).find();
     }
 
     private static String guessIndent(@NotNull String text, int offset) {

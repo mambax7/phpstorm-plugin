@@ -183,6 +183,21 @@ public final class XoopsResultSetGuardInspectionTest {
     }
 
     @Test
+    public void elseifEarlyExitDoesNotDominate() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if ($skip) {
+                    $log->info('skipped');
+                } elseif (!$db->isResultSet($result)) {
+                    return;
+                }
+                $row = $db->fetchArray($result);
+                """;
+        assertEquals(1, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).size());
+    }
+
+    @Test
     public void commentContainingIsResultSetDoesNotGuard() {
         String php = """
                 <?php

@@ -10,11 +10,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.xoops.support.XoopsSupportPlugin;
 
-import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Flags a module {@code .tpl} that sits under {@code templates/} (or {@code blocks/})
@@ -23,9 +20,6 @@ import java.util.regex.Pattern;
  */
 public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTool {
 
-    private static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
-            "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
-    );
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
@@ -78,23 +72,9 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
         return vf;
     }
 
+    /** Registered names as lookup keys; see {@link XoopsManifestTemplates#keys(String)}. */
     static @NotNull Set<String> registeredTemplates(@NotNull String manifestText) {
-        Set<String> out = new LinkedHashSet<>();
-        Matcher m = REGISTERED_TEMPLATE.matcher(PhpTextUtil.maskCommentsOnly(manifestText));
-        while (m.find()) {
-            String key = m.group(1).replace('\\', '/').toLowerCase(Locale.ROOT);
-            out.add(key);
-            // Accept module-root spellings too; relativeTemplateName() is relative
-            // to templates/ or blocks/ (same rule as XoopsProjectScanner).
-            if (key.startsWith("templates/")) {
-                key = key.substring("templates/".length());
-                out.add(key);
-            }
-            if (key.startsWith("blocks/")) {
-                out.add(key.substring("blocks/".length()));
-            }
-        }
-        return out;
+        return XoopsManifestTemplates.keys(manifestText);
     }
 
     private static @Nullable String relativeTemplateName(@NotNull VirtualFile tpl) {

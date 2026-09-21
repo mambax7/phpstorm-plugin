@@ -9,17 +9,12 @@ import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.NotNull;
 import org.xoops.support.XoopsSupportPlugin;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Flags templates listed in xoops_version.php that are missing on disk.
  */
 public final class XoopsMissingRegisteredTemplateInspection extends LocalInspectionTool {
 
-    private static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
-            "(?is)['\"](?:file|template)['\"]\\s*\\]?\\s*=>?\\s*['\"]([^'\"]+\\.tpl)['\"]"
-    );
 
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
@@ -40,15 +35,14 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 String text = file.getText();
                 // Comments only: the registration key and file name are string literals.
                 String code = PhpTextUtil.maskCommentsOnly(text);
-                Matcher m = REGISTERED_TEMPLATE.matcher(code);
-                while (m.find()) {
-                    String template = m.group(1).replace('\\', '/');
+                for (XoopsManifestTemplates.Registration reg : XoopsManifestTemplates.find(code)) {
+                    String template = reg.name();
                     boolean exists = childExists(moduleRoot, "templates/" + template)
                             || childExists(moduleRoot, "templates/blocks/" + template)
                             || childExists(moduleRoot, "blocks/" + template)
                             || childExists(moduleRoot, template);
                     if (!exists) {
-                        PsiElement leaf = PhpTextUtil.leafAt(file, m.start(1));
+                        PsiElement leaf = PhpTextUtil.leafAt(file, reg.nameOffset());
                         if (leaf != null) {
                             holder.registerProblem(
                                     leaf,

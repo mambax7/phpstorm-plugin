@@ -20,6 +20,9 @@ public final class XoopsProjectScannerTest {
         assertTrue(XoopsProjectScanner.VERSION_40.matcher("XOOPS 4.0.0").find());
         assertFalse(XoopsProjectScanner.VERSION_25.matcher("XOOPS 2.7.3").find());
         assertFalse(XoopsProjectScanner.VERSION_27.matcher("version 12.5-extra").find());
+        assertFalse(XoopsProjectScanner.VERSION_25.matcher("version 12.5").find());
+        assertFalse(XoopsProjectScanner.VERSION_27.matcher("php: 12.7").find());
+        assertFalse(XoopsProjectScanner.VERSION_40.matcher("build 14.0").find());
     }
 
     @Test
@@ -28,9 +31,9 @@ public final class XoopsProjectScannerTest {
                 $modversion['dirname'] = 'wgsimpleacc';
                 $modversion['templates'][] = ['file' => 'wgsimpleacc_index.tpl', 'description' => ''];
                 """;
-        var m = XoopsProjectScanner.REGISTERED_TEMPLATE.matcher(manifest);
-        assertTrue(m.find());
-        assertEquals("wgsimpleacc_index.tpl", m.group(1));
+        var regs = org.xoops.support.inspections.XoopsManifestTemplates.find(manifest);
+        assertEquals(1, regs.size());
+        assertEquals("wgsimpleacc_index.tpl", regs.get(0).name());
     }
 
     @Test
@@ -177,6 +180,23 @@ public final class XoopsProjectScannerTest {
             XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
             assertEquals(findings.toString(), 1, findings.size());
             assertEquals("SCAN_ERROR", findings.get(0).kind());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
+    public void registrationLikeStringIsNotAMissingTemplate() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            Files.writeString(moduleRoot.resolve("xoops_version.php"), """
+                    <?php
+                    $example = "'file' => 'ghost.tpl'";
+                    """);
+            Files.createDirectories(moduleRoot.resolve("templates"));
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.toString(), findings.isEmpty());
         } finally {
             deleteRecursively(moduleRoot);
         }
