@@ -8,7 +8,19 @@ and this project uses [Semantic Versioning](https://semver.org/) with pre-releas
 
 ## Unreleased
 
-### Fixed
+_Nothing yet._
+
+## [1.0.0-alpha.3] — 1.0.0 Alpha 3 — 2026-09-21
+
+### Fixed (Goffy / wgSimpleAcc field report)
+
+- Inspections no longer report every finding twice (file-level `visitFile` now runs only on the view-provider's primary PSI file).
+- `isResultSet` quick-fix inserts before the current PSI statement (Inspect Code batch apply no longer no-ops after the first click in a file).
+- An early-exit `isResultSet` / `mysqli_result` guard covers later `fetch*` of the same variable, including `while (list(...) = $db->fetchRow($result))`.
+- ROOT_PATH guard: `die` and `exit` after `namespace` / `use` are recognized; the quick-fix inserts *after* the namespace (never before — invalid PHP).
+- ROOT_PATH guard is not required on 404/403 directory stubs, `admin/` CP scripts, `xoops_version.php`, or files whose first work is including `mainfile.php` / `header.php` / `admin_header.php`.
+
+### Fixed (release review, PR #4)
 
 - Replaced deprecated `StartupActivity` with `ProjectActivity`.
 - `FilenameIndex.getVirtualFilesByName` now passes `Project` (the two-arg overload is deprecated).
@@ -20,16 +32,6 @@ and this project uses [Semantic Versioning](https://semver.org/) with pre-releas
 - isResultSet reassignment ends at `;`, `,`, an unmatched closer, or `or`/`and`/`xor`; `?:`, `??`, `||`, `&&` keep the fetch inside the assignment.
 - ROOT_PATH guard is still required for includes that start with HTML (quick-fix declines without a file-leading open tag); stub detection ignores `;` inside quotes.
 - `xor` in an early-exit condition is not a dominating isResultSet guard; language-constant cap is enforced before the 5001st name; scanner accepts `templates/…` and `blocks/…` manifest spellings and honours Cancel while walking template trees; the unregistered-template inspection applies the same manifest-spelling rule. A block template at `templates/blocks/foo.tpl` registered as `foo.tpl` (the XOOPS convention) is neither "unregistered" nor "missing"; `$modversion['blocks'][1]['template'] = '…'` assignment syntax is read as a registration alongside `'template' => '…'`; commented-out entries are ignored by the scanner too. A positive `isResultSet(...) xor …` guard is not a guard. The comment mask steps over quoted strings, so `//` or `#` inside a string (a URL in a description) no longer hides the rest of the line from the manifest, guard and template readers. A `module.json`-only module is not scanned for unregistered templates. The missing-registered-template inspection reads the manifest through the comment-only mask (it had masked the string literals it needed and never reported). `define()` must be a real call (`mydefine('_MI_…')` is not indexed). The register-template quick-fix ignores commented-out entries. A positive `isResultSet` guard does not cover a fetch inside a closure. The ROOT_PATH quick-fix is attached only where it can insert. An unreadable or oversized `xoops_version.php` yields one `SCAN_ERROR` instead of every template being reported unregistered. Commented-out `define()` lines are not indexed as language constants. Heredoc/nowdoc bodies are skipped by the comment-only mask, so `//` or `/*` inside them cannot hide later code. A VFS event on the `language` directory itself invalidates the constant cache.
-
-## [1.0.0-alpha.3] — 1.0.0 Alpha 3 — 2026-09-02
-
-### Fixed (Goffy / wgSimpleAcc field report)
-
-- Inspections no longer report every finding twice (file-level `visitFile` now runs only on the view-provider's primary PSI file).
-- `isResultSet` quick-fix inserts before the current PSI statement (Inspect Code batch apply no longer no-ops after the first click in a file).
-- An early-exit `isResultSet` / `mysqli_result` guard covers later `fetch*` of the same variable, including `while (list(...) = $db->fetchRow($result))`.
-- ROOT_PATH guard: `die` and `exit` after `namespace` / `use` are recognized; the quick-fix inserts *after* the namespace (never before — invalid PHP).
-- ROOT_PATH guard is not required on 404/403 directory stubs, `admin/` CP scripts, `xoops_version.php`, or files whose first work is including `mainfile.php` / `header.php` / `admin_header.php`.
 
 ### Added
 
