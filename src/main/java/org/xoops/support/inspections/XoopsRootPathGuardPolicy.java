@@ -17,6 +17,7 @@ public final class XoopsRootPathGuardPolicy {
     private static final Pattern OPEN_PHP = Pattern.compile("<\\?php\\b", Pattern.CASE_INSENSITIVE);
     /** {@code <?} not followed by php, =, or xml. */
     private static final Pattern OPEN_SHORT = Pattern.compile("<\\?(?!php|=|xml\\b)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OPEN_ECHO = Pattern.compile("<\\?=", Pattern.CASE_INSENSITIVE);
 
     /** defined('XOOPS_ROOT_PATH') || exit/die */
     private static final Pattern GUARD_OR = Pattern.compile(
@@ -195,6 +196,22 @@ public final class XoopsRootPathGuardPolicy {
         }
         String rest = masked.substring(pos).stripLeading();
         return rest.replaceFirst("(?s)\\?>\\s*$", "").strip();
+    }
+
+    /**
+     * True when {@link InsertRootPathGuardQuickFix} has a safe place to insert: a
+     * file-leading {@code <?php} / {@code <?} (after declare/namespace), a file-leading
+     * {@code <?=}, or a file with no PHP tag at all. HTML before the first tag is declined.
+     */
+    static boolean canInsertGuard(@NotNull String text) {
+        if (insertOffset(text) >= 0) {
+            return true;
+        }
+        Matcher echo = OPEN_ECHO.matcher(text);
+        if (echo.find() && isFileLeading(text, echo.start())) {
+            return true;
+        }
+        return !text.contains("<?");
     }
 
     /** Any {@code <?php} / {@code <?} anywhere, e.g. an include that starts with HTML. */

@@ -38,7 +38,8 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 }
                 VirtualFile moduleRoot = vf.getParent();
                 String text = file.getText();
-                String code = PhpTextUtil.maskCommentsAndStrings(text);
+                // Comments only: the registration key and file name are string literals.
+                String code = PhpTextUtil.maskCommentsOnly(text);
                 Matcher m = REGISTERED_TEMPLATE.matcher(code);
                 while (m.find()) {
                     String template = m.group(1).replace('\\', '/');

@@ -521,7 +521,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     }
                 }
                 if (depth > 0) {
-                    return !assignsResultVar(code, ic.openBrace + 1, fetchOffset, resultVar);
+                    // A closure can run after $var is reassigned, so the guard does not dominate it.
+                    return !assignsResultVar(code, ic.openBrace + 1, fetchOffset, resultVar)
+                            && !hasFunctionKeyword(code, ic.openBrace + 1, fetchOffset);
                 }
             } else if (fetchOffset > ic.condEnd && fetchOffset < ic.ifEnd) {
                 return !assignsResultVar(code, ic.condEnd + 1, fetchOffset, resultVar);

@@ -169,6 +169,20 @@ public final class XoopsResultSetGuardInspectionTest {
     }
 
     @Test
+    public void closureInsidePositiveGuardIsNotGuarded() {
+        String php = """
+                <?php
+                $result = $db->query($sql);
+                if ($db->isResultSet($result)) {
+                    $later = function () use ($db, &$result) {
+                        return $db->fetchArray($result);
+                    };
+                }
+                """;
+        assertEquals(1, XoopsResultSetGuardInspection.unguardedFetchOffsets(php).size());
+    }
+
+    @Test
     public void commentContainingIsResultSetDoesNotGuard() {
         String php = """
                 <?php

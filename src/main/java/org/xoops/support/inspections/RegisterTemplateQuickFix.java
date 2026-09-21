@@ -57,10 +57,9 @@ public final class RegisterTemplateQuickFix implements LocalQuickFix {
             return;
         }
         String text = document.getText();
-        String lowerText = text.toLowerCase(Locale.ROOT);
         String lowerName = templateName.toLowerCase(Locale.ROOT);
-        if (lowerText.contains("'" + lowerName + "'")
-                || lowerText.contains("\"" + lowerName + "\"")) {
+        // Same parser as the inspection: a commented-out entry is not a registration.
+        if (XoopsUnregisteredTemplateInspection.registeredTemplates(text).contains(lowerName)) {
             return;
         }
         String entry = "\n$modversion['templates'][] = [\n"

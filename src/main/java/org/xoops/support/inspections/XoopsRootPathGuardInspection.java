@@ -60,14 +60,16 @@ public final class XoopsRootPathGuardInspection extends LocalInspectionTool {
                         }
                     }
                 }
-                holder.registerProblem(
-                        anchor,
-                        "XOOPS: missing direct-access guard - add "
-                                + "defined('XOOPS_ROOT_PATH') || exit('Restricted access'); "
-                                + "as the first statement after <?php "
-                                + "(after namespace in namespaced files; Alt+Enter or live template: xoguard)",
-                        new InsertRootPathGuardQuickFix()
-                );
+                String message = "XOOPS: missing direct-access guard - add "
+                        + "defined('XOOPS_ROOT_PATH') || exit('Restricted access'); "
+                        + "as the first statement after <?php "
+                        + "(after namespace in namespaced files; Alt+Enter or live template: xoguard)";
+                if (XoopsRootPathGuardPolicy.canInsertGuard(text)) {
+                    holder.registerProblem(anchor, message, new InsertRootPathGuardQuickFix());
+                } else {
+                    // HTML before the first PHP tag: report, but do not offer a no-op fix.
+                    holder.registerProblem(anchor, message);
+                }
             }
         };
     }

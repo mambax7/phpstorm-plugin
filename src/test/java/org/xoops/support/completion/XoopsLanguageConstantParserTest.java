@@ -37,6 +37,21 @@ public final class XoopsLanguageConstantParserTest {
     }
 
     @Test
+    public void parseIgnoresEmbeddedFunctionNames() {
+        String php = """
+                <?php
+                mydefine('_MI_NOT_A_DEFINE', 'x');
+                $obj->define('_MI_NOT_EITHER', 'x');
+                \\define('_MI_NAMESPACED', 'y');
+                define('_MI_PLAIN', 'z');
+                """;
+        List<XoopsLanguageConstantParser.Occurrence> occ = XoopsLanguageConstantParser.parse(php);
+        assertEquals(2, occ.size());
+        assertEquals("_MI_NAMESPACED", occ.get(0).name());
+        assertEquals("_MI_PLAIN", occ.get(1).name());
+    }
+
+    @Test
     public void parsePreservesDistinctSpellings() {
         String php = """
                 <?php

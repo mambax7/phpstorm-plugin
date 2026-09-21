@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 public final class XoopsLanguageConstantParser {
 
     public static final Pattern DEFINE = Pattern.compile(
-            "define\\s*\\(\\s*['\"](_(?:MI|AM|MD|CO|MB)_[A-Z0-9_]+)['\"]",
+            "(?<![A-Za-z0-9_$\\\\>:])\\\\?define\\b\\s*\\(\\s*['\"](_(?:MI|AM|MD|CO|MB)_[A-Z0-9_]+)['\"]",
             Pattern.CASE_INSENSITIVE
     );
 

@@ -85,8 +85,10 @@ public final class XoopsUnregisteredTemplateInspection extends LocalInspectionTo
             // Accept module-root spellings too; relativeTemplateName() is relative
             // to templates/ or blocks/ (same rule as XoopsProjectScanner).
             if (key.startsWith("templates/")) {
-                out.add(key.substring("templates/".length()));
-            } else if (key.startsWith("blocks/")) {
+                key = key.substring("templates/".length());
+                out.add(key);
+            }
+            if (key.startsWith("blocks/")) {
                 out.add(key.substring("blocks/".length()));
             }
         }

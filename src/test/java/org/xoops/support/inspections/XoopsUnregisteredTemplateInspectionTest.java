@@ -61,5 +61,9 @@ public final class XoopsUnregisteredTemplateInspectionTest {
         assertTrue(names.contains("rooted.tpl"));
         assertTrue(names.contains("rooted_block.tpl"));
         assertTrue(names.contains("templates/rooted.tpl"));
+        Set<String> full = XoopsUnregisteredTemplateInspection.registeredTemplates(
+                "<?php $modversion['templates'][] = ['file' => 'templates/blocks/deep_block.tpl'];");
+        assertTrue(full.contains("blocks/deep_block.tpl"));
+        assertTrue(full.contains("deep_block.tpl"));
     }
 }

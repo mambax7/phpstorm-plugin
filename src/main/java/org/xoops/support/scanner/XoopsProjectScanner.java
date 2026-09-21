@@ -327,8 +327,10 @@ public final class XoopsProjectScanner {
                 // A manifest may spell the path from the module root; the walk keys are
                 // relative to templates/ or blocks/, so accept both spellings.
                 if (key.startsWith("templates/")) {
-                    registered.add(key.substring("templates/".length()));
-                } else if (key.startsWith("blocks/")) {
+                    key = key.substring("templates/".length());
+                    registered.add(key);
+                }
+                if (key.startsWith("blocks/")) {
                     registered.add(key.substring("blocks/".length()));
                 }
                 boolean exists = Files.isRegularFile(moduleRoot.resolve("templates").resolve(template))

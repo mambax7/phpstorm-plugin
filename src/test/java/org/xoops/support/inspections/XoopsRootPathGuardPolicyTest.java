@@ -94,6 +94,10 @@ public final class XoopsRootPathGuardPolicyTest {
                 source
         ));
         assertEquals(-1, XoopsRootPathGuardPolicy.insertOffset(source));
+        assertFalse(XoopsRootPathGuardPolicy.canInsertGuard(source));
+        assertTrue(XoopsRootPathGuardPolicy.canInsertGuard("<?php\nclass A {}\n"));
+        assertTrue(XoopsRootPathGuardPolicy.canInsertGuard("<?= $x ?>\n"));
+        assertTrue(XoopsRootPathGuardPolicy.canInsertGuard("plain text, no php\n"));
     }
 
     @Test
