@@ -128,6 +128,41 @@ public final class XoopsProjectScannerTest {
     }
 
     @Test
+    public void urlInDescriptionDoesNotHideRegistrationOnSameLine() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            Files.writeString(moduleRoot.resolve("xoops_version.php"), """
+                    <?php
+                    $modversion['templates'][] = ['description' => 'see https://xoops.org #1', 'file' => 'listed.tpl'];
+                    """);
+            Path templates = moduleRoot.resolve("templates");
+            Files.createDirectories(templates);
+            Files.writeString(templates.resolve("listed.tpl"), "<{$x}>");
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.toString(), findings.isEmpty());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
+    public void moduleJsonOnlyModuleIsNotScannedForTemplates() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            Files.writeString(moduleRoot.resolve("module.json"), "{\"name\": \"demo\"}");
+            Path templates = moduleRoot.resolve("templates");
+            Files.createDirectories(templates);
+            Files.writeString(templates.resolve("demo_index.tpl"), "<{$x}>");
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.toString(), findings.isEmpty());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
     public void missingRegisteredTemplateScan() throws Exception {
         Path moduleRoot = Files.createTempDirectory("xoops-mod");
         try {

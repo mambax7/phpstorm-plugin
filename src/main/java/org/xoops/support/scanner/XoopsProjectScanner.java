@@ -312,6 +312,9 @@ public final class XoopsProjectScanner {
 
     static void checkRegisteredTemplates(Path moduleRoot, List<XoopsFinding> findings) {
         Path manifest = moduleRoot.resolve("xoops_version.php");
+        if (!Files.isRegularFile(manifest)) {
+            return; // module.json-only module: no legacy manifest to compare templates against
+        }
         String content = readSmallFile(manifest).orElse("");
         Set<String> registered = new LinkedHashSet<>();
         if (!content.isEmpty()) {

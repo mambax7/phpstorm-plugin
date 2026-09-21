@@ -179,6 +179,17 @@ public final class PhpTextUtil {
                 continue;
             }
             if (!maskStrings) {
+                // Keep the string, but step over it so // and # inside it are not comments.
+                if (chars[i] == '\'' || chars[i] == '"') {
+                    char quote = chars[i++];
+                    while (i < n && chars[i] != quote) {
+                        i += (chars[i] == '\\' && i + 1 < n) ? 2 : 1;
+                    }
+                    if (i < n) {
+                        i++;
+                    }
+                    continue;
+                }
                 i++;
                 continue;
             }

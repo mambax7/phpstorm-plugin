@@ -27,6 +27,18 @@ public final class XoopsUnregisteredTemplateInspectionTest {
     }
 
     @Test
+    public void commentMarkersInsideStringsAreNotComments() {
+        String manifest = """
+                <?php
+                $modversion['templates'][] = ['description' => 'see https://xoops.org #1', 'file' => 'listed.tpl'];
+                // 'file' => 'commented.tpl'
+                """;
+        Set<String> names = XoopsUnregisteredTemplateInspection.registeredTemplates(manifest);
+        assertTrue(names.contains("listed.tpl"));
+        assertFalse(names.contains("commented.tpl"));
+    }
+
+    @Test
     public void assignmentSyntaxRegistersTemplatesToo() {
         String manifest = """
                 <?php
