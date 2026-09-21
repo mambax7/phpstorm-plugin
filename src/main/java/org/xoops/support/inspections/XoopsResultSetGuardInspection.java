@@ -472,8 +472,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         if (conditionNegatesIsResultSet(cond, resultVar)) {
             return false;
         }
-        // Reject OR-paths at any depth: isResultSet($r) || $fallback / (isResultSet($r) || $x)
-        return !hasBoolOpAnywhere(cond, true);
+        // Reject OR-paths at any depth: isResultSet($r) || $fallback / (isResultSet($r) || $x),
+        // and xor: isResultSet($r) xor $x is true when $r is not a result set and $x is.
+        return !hasBoolOpAnywhere(cond, true) && !hasXorAnywhere(cond);
     }
 
     /**

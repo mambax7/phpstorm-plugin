@@ -110,6 +110,24 @@ public final class XoopsProjectScannerTest {
     }
 
     @Test
+    public void commentedManifestEntryIsNotARegistration() throws Exception {
+        Path moduleRoot = Files.createTempDirectory("xoops-mod");
+        try {
+            Files.writeString(moduleRoot.resolve("xoops_version.php"), """
+                    <?php
+                    // $modversion['blocks'][1]['template'] = 'ghost.tpl';
+                    /* $modversion['templates'][] = ['file' => 'ghost2.tpl']; */
+                    """);
+            Files.createDirectories(moduleRoot.resolve("templates"));
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(moduleRoot, findings);
+            assertTrue(findings.toString(), findings.isEmpty());
+        } finally {
+            deleteRecursively(moduleRoot);
+        }
+    }
+
+    @Test
     public void missingRegisteredTemplateScan() throws Exception {
         Path moduleRoot = Files.createTempDirectory("xoops-mod");
         try {

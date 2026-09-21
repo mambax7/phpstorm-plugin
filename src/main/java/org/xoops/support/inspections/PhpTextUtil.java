@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 /**
  * Lightweight helpers for text-based XOOPS inspections.
  */
-final class PhpTextUtil {
+public final class PhpTextUtil {
 
     private PhpTextUtil() {
     }
@@ -65,7 +65,7 @@ final class PhpTextUtil {
      * Mask comments only (keep string/heredoc contents) so call-site patterns that
      * need literal tokens still work while ignoring commented-out code.
      */
-    static @NotNull String maskCommentsOnly(@NotNull String text) {
+    public static @NotNull String maskCommentsOnly(@NotNull String text) {
         return maskInternal(text, false);
     }
 

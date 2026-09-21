@@ -2,6 +2,7 @@ package org.xoops.support.scanner;
 
 import com.intellij.openapi.progress.ProgressManager;
 import org.jetbrains.annotations.NotNull;
+import org.xoops.support.inspections.PhpTextUtil;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -314,7 +315,8 @@ public final class XoopsProjectScanner {
         String content = readSmallFile(manifest).orElse("");
         Set<String> registered = new LinkedHashSet<>();
         if (!content.isEmpty()) {
-            Matcher matcher = REGISTERED_TEMPLATE.matcher(content);
+            // Masked copy keeps offsets, so lineAt() on the original content stays right.
+            Matcher matcher = REGISTERED_TEMPLATE.matcher(PhpTextUtil.maskCommentsOnly(content));
             while (matcher.find()) {
                 String template = matcher.group(1).replace('\\', '/');
                 String key = template.toLowerCase(Locale.ROOT);
@@ -354,10 +356,10 @@ public final class XoopsProjectScanner {
         }
         int[] seen = {0};
         try (Stream<Path> paths = Files.walk(directory, 6)) {
-            paths.filter(Files::isRegularFile)
+            paths.peek(p -> checkCanceledEvery(seen))
+                    .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".tpl"))
                     .forEach(path -> {
-                        checkCanceledEvery(seen);
                         String relative = directory.relativize(path).toString().replace('\\', '/');
                         String key = relative.toLowerCase(Locale.ROOT);
                         // templates/blocks/foo.tpl is registered as 'foo.tpl' by convention.

@@ -182,7 +182,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
             }
             for (XoopsLanguageConstantParser.Occurrence occ : XoopsLanguageConstantParser.parse(psi.getText())) {
                 if (!names.contains(occ.name()) && names.size() >= MAX_CONSTANTS) {
-                    return new Index(Collections.unmodifiableSet(names), Map.copyOf(defs));
+                    continue; // cap new names; definitions of known names are still recorded
                 }
                 names.add(occ.name());
                 defs.computeIfAbsent(occ.name(), k -> new ArrayList<>()).add(new Def(vf, occ.offset()));

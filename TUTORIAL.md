@@ -30,7 +30,7 @@ Then **Install Plugin from Disk…** → `build/distributions/xoops-support-*.zi
 2. **Refresh** (or **Tools → XOOPS Support → Refresh XOOPS Overview**)
 3. Click findings to open files.
 
-![](https://plugins.jetbrains.com/files/33478/screenshot_200ef8b4-f28f-4bbd-95f3-3f310b27fed7)
+![XOOPS Support Overview tool window: modules table and findings](https://plugins.jetbrains.com/files/33478/screenshot_200ef8b4-f28f-4bbd-95f3-3f310b27fed7)
 
 **Reading the Overview.** The header line gives the totals (here 22 modules, 316 findings) and the detected core line (**XOOPS 2.7.x**, from the Core Version setting or auto-detection) with the web root the scan used.
 
@@ -44,7 +44,7 @@ The **Modules** table lists every directory under `modules/` that has a manifest
 | Pre | `.php` files under `preloads/` |
 | Cls | `.php` files under `class/` and `src/` together |
 
-The counts are a quick health read: **TPL 0** means the module renders nothing of its own (fine for a library module such as `protector` or `xwhoops`), **Lang 3** next to **Lang 445** shows how many locales ship, and an unexpectedly large **Cls** usually means a vendored library sits under `class/` or `src/`.
+The counts are a quick health read: **TPL 0** means the module renders nothing of its own (fine for a library module such as `protector` or `xwhoops`), **Lang** grows with every shipped locale (each adds its own set of files), and an unexpectedly large **Cls** usually means a vendored library sits under `class/` or `src/`.
 
 **Findings** are listed per module in the same order as the table. Each line is a kind, a message and a `file:line` link that opens the editor at that spot. The kinds map onto the section 4 inspections:
 
@@ -158,7 +158,7 @@ include_once __DIR__ . '/footer.php';
 
 ### 4.5 Direct-access guard — `XoopsRootPathGuard`
 
-Reports include-only PHP files (classes, preloads, includes, blocks) that lack a terminating `defined('XOOPS_ROOT_PATH') || exit/die(...)` guard. The guard must be the first executable statement after `<?php`, `declare`, `namespace`, and `use`. `die` and `exit` are both accepted. In namespaced files the quick-fix inserts the guard **after** the namespace (never before, that is invalid PHP).
+Reports include-only PHP files (classes, preloads, includes, blocks) that lack a terminating `defined('XOOPS_ROOT_PATH') || exit/die(...)` guard. The guard must be the first executable statement after `<?php`, `declare` and `namespace`; a `use` block before or after it is fine. `die` and `exit` are both accepted. In namespaced files the quick-fix inserts the guard **after** the namespace and before the `use` block (never before `namespace`, that is invalid PHP).
 
 Not reported: language files, vendor/cache, tests, `xoops_version.php`, `admin/` control-panel scripts, files whose first work is including `mainfile.php` / `header.php` / `admin_header.php`, and directory-protection stubs that only send HTTP 404/403.
 
@@ -230,6 +230,8 @@ $modversion['templates'][] = [
     'description' => 'Index page',
 ];
 ```
+
+Both template inspections read `xoops_version.php` only, so they cover legacy and hybrid modules; a `module.json`-only module is not checked.
 
 **Quick-fix** creates the file under `templates/`, keeping any sub-path in the name (`blocks/demo_block.tpl` becomes `templates/blocks/demo_block.tpl`), with a Smarty comment `<{* name *}>` as placeholder so the manifest and disk agree; fill in the markup afterwards. The inspection runs on `xoops_version.php` and is the inverse of 4.9.
 
