@@ -5,10 +5,10 @@ Reports <b>include-only</b> PHP files (classes, preloads, includes, blocks) that
 terminating <code>defined('XOOPS_ROOT_PATH') || exit/die(...)</code> guard.
 <p>
 The guard must be the first executable statement after <code>&lt;?php</code>,
-<code>declare</code>, <code>namespace</code>, and <code>use</code>.
-<code>die</code> and <code>exit</code> are both accepted.
-In namespaced files the quick-fix inserts the guard <em>after</em> the namespace
-(never before — that is invalid PHP).
+<code>declare</code> and <code>namespace</code>; a <code>use</code> block before or
+after it is fine. <code>die</code> and <code>exit</code> are both accepted.
+In namespaced files the quick-fix inserts the guard <em>after</em> the namespace and
+before the <code>use</code> block (never before <code>namespace</code>, that is invalid PHP).
 </p>
 <p>
 Not reported: language files, vendor/cache, tests, <code>xoops_version.php</code>,
