@@ -1,8 +1,16 @@
 <!doctype html>
 <html>
 <body>
-Warns when <code>fetchArray</code> / <code>fetchRow</code> / <code>fetchBoth</code> appears without a nearby
-<code>isResultSet</code> check. Prefer the two-part guard:
-<pre>if (!$db-&gt;isResultSet($result) || !$result instanceof \mysqli_result) { … }</pre>
+Warns when <code>fetchArray</code> / <code>fetchRow</code> / <code>fetchBoth</code> appears without a
+dominating <code>isResultSet</code> check. Prefer the two-part guard:
+<pre>if (!$db-&gt;isResultSet($result) || !$result instanceof \mysqli_result) {
+    throw new \RuntimeException('Database query failed');
+}</pre>
+<p>
+An early-exit guard covers later fetches of the same variable, including
+<code>while (list(...) = $db-&gt;fetchRow($result))</code>, until that variable is reassigned.
+The quick-fix inserts before the enclosing statement using the current PSI
+(safe to apply several times after Inspect Code).
+</p>
 </body>
 </html>

@@ -1,9 +1,9 @@
 package org.xoops.support.scanner;
 
 /**
- * Detected XOOPS core line .
+ * Detected XOOPS core line.
  */
-public enum CoreProfile {
+public enum CoreVersion {
     XOOPS_25("XOOPS 2.5.x"),
     XOOPS_27("XOOPS 2.7.x"),
     XOOPS_40("XOOPS 4.0"),
@@ -13,7 +13,7 @@ public enum CoreProfile {
 
     private final String displayName;
 
-    CoreProfile(String displayName) {
+    CoreVersion(String displayName) {
         this.displayName = displayName;
     }
 

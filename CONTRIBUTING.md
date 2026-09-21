@@ -24,6 +24,9 @@ Thanks for helping improve the PhpStorm plugin for XOOPS developers.
 
 - Java 21, package root `org.xoops.support`.
 - Keep inspections **fast and heuristic** unless a full PSI analysis is clearly worth it.
+- File-level `visitFile` inspections must call `PhpTextUtil.isPrimaryPsiFile` (PHP+HTML dual PSI).
+- Quick-fixes compute ranges from the PSI element at apply-time, not frozen offsets.
+- Tests are **JUnit 4** (`org.junit.Test`, public classes/methods) via `testFramework(TestFrameworkType.Platform)`. Jupiter will not start the IPG executor.
 - Prefer **quick fixes** that are safe and local (single file / small edit).
 - Do not hard-code AI vendor names or branding in UI strings.
 - Index / PSI access from background threads must use `ReadAction` (see `XoopsProjectService`).
@@ -38,11 +41,11 @@ CI runs the same command set.
 
 ## Version bumps
 
-1. Update `pluginVersion` in `gradle.properties`.
-2. Update `<version>` and change-notes in `src/main/resources/META-INF/plugin.xml`.
-3. Update `CHANGELOG.md` and `whats-new.html`.
+1. Update `pluginVersion` in `gradle.properties` (this is the single source; do not add `<version>` to `plugin.xml`).
+2. Update change-notes in `src/main/resources/META-INF/plugin.xml`.
+3. Update `CHANGELOG.md` and `whats-new.html` (and the version table in `README.md`).
 4. Tag release with the **same** version as `pluginVersion` in `gradle.properties`, e.g.  
-   `git tag v1.0.0-alpha.1 && git push origin v1.0.0-alpha.1` (triggers release workflow).
+   `git tag v1.0.0-alpha.3 && git push origin v1.0.0-alpha.3` (triggers release workflow).
 
 ## Reporting issues
 

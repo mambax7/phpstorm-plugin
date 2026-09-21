@@ -62,7 +62,7 @@ public final class ShowXoopsProjectInfoAction extends AnAction implements DumbAw
         if (!report.xoopsProject()) {
             sb.append("No XOOPS markers found (mainfile.php / xoops_version.php).");
         } else {
-            sb.append(report.profile().displayName()).append('\n');
+            sb.append(report.coreVersion().displayName()).append('\n');
             sb.append("Web root: ").append(report.webRoot()).append('\n');
             sb.append("Modules: ").append(report.modules().size()).append('\n');
             int i = 0;

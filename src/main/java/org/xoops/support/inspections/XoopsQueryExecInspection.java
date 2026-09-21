@@ -29,7 +29,7 @@ public final class XoopsQueryExecInspection extends LocalInspectionTool {
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
-                if (!XoopsSupportPlugin.isEnabled(file)) {
+                if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
                     return;
                 }
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {

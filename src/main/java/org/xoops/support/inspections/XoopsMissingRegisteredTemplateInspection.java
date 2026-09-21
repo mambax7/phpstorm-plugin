@@ -26,7 +26,7 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
-                if (!XoopsSupportPlugin.isEnabled(file)) {
+                if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
                     return;
                 }
                 if (!"xoops_version.php".equalsIgnoreCase(file.getName())) {

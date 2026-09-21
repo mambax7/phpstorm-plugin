@@ -24,7 +24,7 @@ public final class XoopsConfigurable implements Configurable {
     private JCheckBox enabledBox;
     private JCheckBox suppressNotifyBox;
     private JCheckBox autoScanBox;
-    private JComboBox<String> profileBox;
+    private JComboBox<String> coreVersionBox;
     private JTextField prefixField;
     private JPanel panel;
 
@@ -61,10 +61,10 @@ public final class XoopsConfigurable implements Configurable {
         form.add(autoScanBox, c);
 
         c.gridy++;
-        form.add(new JLabel("Core profile:"), c);
+        form.add(new JLabel("Core Version:"), c);
         c.gridx = 1;
-        profileBox = new JComboBox<>(new String[]{"Auto", "2.5", "2.7", "4.0"});
-        form.add(profileBox, c);
+        coreVersionBox = new JComboBox<>(new String[]{"Auto", "2.5", "2.7", "4.0"});
+        form.add(coreVersionBox, c);
 
         c.gridx = 0;
         c.gridy++;
@@ -82,13 +82,13 @@ public final class XoopsConfigurable implements Configurable {
     @Override
     public boolean isModified() {
         XoopsSettingsState s = XoopsSettingsState.getInstance(project);
-        String selectedProfile = String.valueOf(profileBox.getSelectedItem());
-        String storedProfile = s.coreProfile == null ? "Auto" : s.coreProfile;
+        String selectedCoreVersion = String.valueOf(coreVersionBox.getSelectedItem());
+        String storedCoreVersion = s.coreVersion == null ? "Auto" : s.coreVersion;
         String storedPrefix = s.tablePrefix == null ? "" : s.tablePrefix;
         return enabledBox.isSelected() != s.enabled
                 || suppressNotifyBox.isSelected() != s.suppressStartupNotification
                 || autoScanBox.isSelected() != s.autoScanOnToolWindowOpen
-                || !Objects.equals(selectedProfile, storedProfile)
+                || !Objects.equals(selectedCoreVersion, storedCoreVersion)
                 || !Objects.equals(prefixField.getText().trim(), storedPrefix);
     }
 
@@ -98,7 +98,7 @@ public final class XoopsConfigurable implements Configurable {
         s.enabled = enabledBox.isSelected();
         s.suppressStartupNotification = suppressNotifyBox.isSelected();
         s.autoScanOnToolWindowOpen = autoScanBox.isSelected();
-        s.coreProfile = String.valueOf(profileBox.getSelectedItem());
+        s.coreVersion = String.valueOf(coreVersionBox.getSelectedItem());
         s.tablePrefix = prefixField.getText().trim();
     }
 
@@ -108,7 +108,7 @@ public final class XoopsConfigurable implements Configurable {
         enabledBox.setSelected(s.enabled);
         suppressNotifyBox.setSelected(s.suppressStartupNotification);
         autoScanBox.setSelected(s.autoScanOnToolWindowOpen);
-        profileBox.setSelectedItem(s.coreProfile == null ? "Auto" : s.coreProfile);
+        coreVersionBox.setSelectedItem(s.coreVersion == null ? "Auto" : s.coreVersion);
         prefixField.setText(s.tablePrefix == null ? "" : s.tablePrefix);
     }
 }

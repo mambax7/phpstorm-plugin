@@ -25,7 +25,7 @@ public final class XoopsWrongSmartyDelimiterInspection extends LocalInspectionTo
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
-                if (!XoopsSupportPlugin.isEnabled(file)) {
+                if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
                     return;
                 }
                 String name = file.getName().toLowerCase(java.util.Locale.ROOT);

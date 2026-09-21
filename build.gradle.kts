@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 fun prop(key: String): String =
     providers.gradleProperty(key).orNull
@@ -24,7 +25,9 @@ dependencies {
         phpstorm(prop("platformVersion"))
         bundledPlugin("com.jetbrains.php")
         pluginVerifier()
+        testFramework(TestFrameworkType.Platform)
     }
+    testImplementation("junit:junit:4.13.2")
 }
 
 java {
@@ -57,8 +60,8 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            // Same PhpStorm we compile against — keeps CI time/bandwidth predictable.
-            // Expand with recommended() / select { ... } when you want a wider matrix.
+            // PhpStorm only. Verifying IntelliJ IDEA (IU) without the PHP plugin
+            // yields a false Critical: "missing mandatory dependency com.jetbrains.php".
             create(IntelliJPlatformType.PhpStorm, prop("platformVersion"))
         }
     }
@@ -72,6 +75,10 @@ tasks {
 
     wrapper {
         gradleVersion = prop("gradleVersion")
+    }
+
+    test {
+        useJUnit()
     }
 
     runIde {

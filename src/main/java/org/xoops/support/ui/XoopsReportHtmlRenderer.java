@@ -70,7 +70,7 @@ public final class XoopsReportHtmlRenderer {
 
         StringBuilder html = new StringBuilder(4096);
         html.append(BODY_OPEN)
-                .append("<h2>").append(escape(report.profile().displayName())).append("</h2>")
+                .append("<h2>").append(escape(report.coreVersion().displayName())).append("</h2>")
                 .append("<p><b>Web root:</b> <code>")
                 .append(escape(report.webRoot().toString()))
                 .append("</code></p>")

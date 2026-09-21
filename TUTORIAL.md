@@ -22,7 +22,7 @@ Then **Install Plugin from Disk…** → `build/distributions/xoops-support-*.zi
 1. Open a **real XOOPS install** (with `mainfile.php` or `htdocs/mainfile.php`). This plugin repository alone is not a XOOPS site root.
 2. Optional balloon: “XOOPS Support active”.
 3. **Tools → XOOPS Support → Show XOOPS Project Info** (runs in the background).
-4. **Settings** (search “XOOPS Support”): enable/disable, profile, suppress notification.
+4. **Settings** (search “XOOPS Support”): enable/disable, Core Version, suppress notification.
 
 ## 3. Tool window / scanner
 
@@ -36,6 +36,7 @@ Then **Install Plugin from Disk…** → `build/distributions/xoops-support-*.zi
 2. Open it — highlights for guards, query/exec, Request, etc.
 3. **Alt+Enter** on each highlight and apply the fix.
 4. For Smarty: a `.tpl` with bare `{if …}` should offer delimiter conversion.
+5. Goffy / wgSimpleAcc shapes: `test-fixtures/wgsimpleacc_shapes.php` (namespaced `die` guard + `while (list = fetchRow)`) and `test-fixtures/index_404_stub.php` (must **not** warn).
 
 ## 5. Live templates
 
@@ -54,7 +55,7 @@ In a PHP file, type the abbreviation and press **Tab**:
 
 ## 6. Language constants
 
-Type `_MI_` (or `_AM_`, `_MD_`, …) and **Ctrl+Space** — completions from `language/**/*.php` defines.
+Type `_MI_` (or `_AM_`, `_MD_`, `_CO_`, `_MB_`) and **Ctrl+Space** — completions from every `language/**/*.php` `define()`. **Ctrl+B** (Go to Declaration) on a constant jumps to the `define()` (prefers `language/english/`).
 
 ## 7. New module
 
@@ -67,7 +68,7 @@ Type `_MI_` (or `_AM_`, `_MD_`, …) and **Ctrl+Space** — completions from `la
 
 | Action | Purpose |
 | --- | --- |
-| Show XOOPS Project Info | Dialog: profile, web root, modules |
+| Show XOOPS Project Info | Dialog: Core Version, web root, modules |
 | Refresh XOOPS Overview | Rescan + tool window |
 | New XOOPS Module Stub… | Scaffold module |
 

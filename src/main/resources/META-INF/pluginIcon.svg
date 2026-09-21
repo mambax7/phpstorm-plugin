@@ -1,4 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-    <rect width="40" height="40" rx="8" fill="#1565C0"/>
-    <path d="M9 10h6l5 7 5-7h6l-8 11 8 10h-6l-5-7-5 7H9l8-10z" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 128 128">
+  <defs>
+    <radialGradient id="xoopsBigFill" cx="38%" cy="28%" r="78%">
+      <stop offset="0%" stop-color="#F2F8FF"/>
+      <stop offset="18%" stop-color="#C5DFFC"/>
+      <stop offset="42%" stop-color="#5AA4F8"/>
+      <stop offset="70%" stop-color="#1E6EE8"/>
+      <stop offset="100%" stop-color="#1739B0"/>
+    </radialGradient>
+    <radialGradient id="xoopsSmallFill" cx="58%" cy="26%" r="78%">
+      <stop offset="0%" stop-color="#F2F8FF"/>
+      <stop offset="22%" stop-color="#B7D6FB"/>
+      <stop offset="55%" stop-color="#3B8AF2"/>
+      <stop offset="100%" stop-color="#1739B0"/>
+    </radialGradient>
+    <clipPath id="xoopsBigClip">
+      <circle cx="54.63" cy="68.75" r="42.26"/>
+    </clipPath>
+    <clipPath id="xoopsSmallClip">
+      <circle cx="96.98" cy="32.03" r="22.94"/>
+    </clipPath>
+  </defs>
+  <circle cx="54.63" cy="68.75" r="45.28" fill="url(#xoopsBigFill)" stroke="#3F3F3F" stroke-width="6.05"/>
+  <g clip-path="url(#xoopsBigClip)">
+    <ellipse cx="36" cy="80" rx="26" ry="34" fill="#1A58C8" opacity=".55" transform="rotate(-28 36 80)"/>
+    <ellipse cx="72" cy="94" rx="34" ry="20" fill="#163FB8" opacity=".5" transform="rotate(18 72 94)"/>
+    <ellipse cx="60" cy="50" rx="24" ry="18" fill="#E4F1FF" opacity=".28"/>
+  </g>
+  <circle cx="96.98" cy="32.03" r="24.45" fill="url(#xoopsSmallFill)" stroke="#3F3F3F" stroke-width="3.02"/>
+  <g clip-path="url(#xoopsSmallClip)">
+    <ellipse cx="88" cy="40" rx="13" ry="15" fill="#1A58C8" opacity=".5" transform="rotate(-32 88 40)"/>
+    <ellipse cx="104" cy="24" rx="10" ry="8" fill="#E4F1FF" opacity=".32"/>
+  </g>
 </svg>

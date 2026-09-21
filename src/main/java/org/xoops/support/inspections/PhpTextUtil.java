@@ -28,6 +28,19 @@ final class PhpTextUtil {
         return name.endsWith(".php") || name.endsWith(".inc");
     }
 
+    /**
+     * True for the view-provider's base-language PSI file. PhpStorm .php files have
+     * PHP + HTML trees; a {@code visitFile} regex walk on both doubles every finding.
+     */
+    static boolean isPrimaryPsiFile(@Nullable PsiFile file) {
+        if (file == null) {
+            return false;
+        }
+        var viewProvider = file.getViewProvider();
+        PsiFile base = viewProvider.getPsi(viewProvider.getBaseLanguage());
+        return base == null || file.equals(base);
+    }
+
     static boolean looksLikeLanguageFile(@NotNull PsiFile file) {
         String path = file.getVirtualFile() != null
                 ? file.getVirtualFile().getPath().replace('\\', '/').toLowerCase(Locale.ROOT)

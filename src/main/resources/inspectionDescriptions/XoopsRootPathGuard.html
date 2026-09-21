@@ -1,8 +1,20 @@
 <!doctype html>
 <html>
 <body>
-Reports PHP files under <code>modules/</code>, <code>class/</code>, <code>preloads/</code>, or <code>kernel/</code>
-that do not contain a <code>defined('XOOPS_ROOT_PATH')</code> direct-access guard.
-<p>Quick-fix inserts the standard guard after <code>&lt;?php</code>.</p>
+Reports <b>include-only</b> PHP files (classes, preloads, includes, blocks) that lack a
+terminating <code>defined('XOOPS_ROOT_PATH') || exit/die(...)</code> guard.
+<p>
+The guard must be the first executable statement after <code>&lt;?php</code>,
+<code>declare</code>, <code>namespace</code>, and <code>use</code>.
+<code>die</code> and <code>exit</code> are both accepted.
+In namespaced files the quick-fix inserts the guard <em>after</em> the namespace
+(never before — that is invalid PHP).
+</p>
+<p>
+Not reported: language files, vendor/cache, tests, <code>xoops_version.php</code>,
+<code>admin/</code> control-panel scripts, files whose first work is including
+<code>mainfile.php</code> / <code>header.php</code> / <code>admin_header.php</code>,
+and directory-protection stubs that only send HTTP 404/403.
+</p>
 </body>
 </html>

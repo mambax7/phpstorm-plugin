@@ -6,8 +6,11 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.startup.StartupActivity;
+import com.intellij.openapi.startup.ProjectActivity;
+import kotlin.Unit;
+import kotlin.coroutines.Continuation;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.xoops.support.settings.XoopsSettingsState;
 
 /**
@@ -19,10 +22,15 @@ import org.xoops.support.settings.XoopsSettingsState;
  * <p>All deferred work is expired with {@link Project#getDisposed()} so pending callbacks
  * do not pin the plugin classloader across unload.
  */
-public final class XoopsStartupActivity implements StartupActivity {
+public final class XoopsStartupActivity implements ProjectActivity {
 
     @Override
-    public void runActivity(@NotNull Project project) {
+    public @Nullable Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
+        scheduleNotification(project);
+        return Unit.INSTANCE;
+    }
+
+    private void scheduleNotification(@NotNull Project project) {
         if (project.isDisposed()) {
             return;
         }

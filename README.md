@@ -8,15 +8,15 @@ It brings XOOPS conventions into the IDE: inspections with Alt+Enter quick fixes
 | --- | --- |
 | Repository | [github.com/XOOPS/phpstorm-plugin](https://github.com/XOOPS/phpstorm-plugin) |
 | Plugin id | `org.xoops.plugin.support` |
-| Version | **1.0.0 Alpha 1** (`1.0.0-alpha.1`) |
+| Version | **1.0.0 Alpha 3** (`1.0.0-alpha.3`) |
 | Compatibility | PhpStorm **2024.3+** (since-build `243`, no upper cap — includes **2026.2.x**) |
 | License | [GPL-2.0-or-later](LICENSE) |
 
 ## Features
 
-- **Inspections + quick fixes** — root-path guards, `isResultSet` before `fetch*`, `query()` vs `exec()`, deprecated `queryF`/`quoteString`, missing registered templates, wrong Smarty delimiters, `include` → `include_once` for headers. For input: **keyed** `$_GET`/`$_POST`/`$_COOKIE['key']` offer `\Xmf\Request::getString` fixes; **bare** `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE` and **keyed `$_REQUEST`** are warnings only (no auto-fix when the source is ambiguous)
+- **Inspections + quick fixes** — root-path guards (namespaced files; 404/entry-point skips), `isResultSet` before `fetch*` (including `while (list = fetchRow)`), `query()` vs `exec()`, deprecated `queryF`/`quoteString` and `XOBJ_DTYPE_UNICODE_*`, missing *and unregistered* templates, wrong Smarty delimiters, `include` → `include_once` for headers. For input: **keyed** `$_GET`/`$_POST`/`$_COOKIE['key']` offer `\Xmf\Request::getString` fixes; **bare** `$_GET`/`$_POST`/`$_REQUEST`/`$_COOKIE` and **keyed `$_REQUEST`** are warnings only (no auto-fix when the source is ambiguous)
 - **Live templates** — `xoguard`, `xofetch`, `xofetchdb`, `xohead`, `xolang`, `xocriteria`, `xorequest`, `xoexec`
-- **Language constants** — completion for `_MI_` / `_AM_` / `_MD_` / … from `language/**/*.php`
+- **Language constants** — completion and Ctrl+B for `_MI_` / `_AM_` / `_MD_` / `_CO_` / `_MB_` from every `language/**/*.php`
 - **Project tools** — detection balloon, scanner tool window, **Tools → XOOPS Support**
 - **Module scaffold** — legacy or hybrid (PSR-4 / composer) via **New → XOOPS Module…**
 
@@ -81,7 +81,7 @@ xoops-support/
 Edit `gradle.properties` for version and platform target:
 
 ```properties
-pluginVersion=1.0.0-alpha.1
+pluginVersion=1.0.0-alpha.3
 platformVersion=2024.3.5
 pluginSinceBuild=243
 pluginUntilBuild=          # empty = open-ended (2026.2+)

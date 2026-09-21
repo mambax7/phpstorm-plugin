@@ -53,6 +53,7 @@ public final class XoopsProjectService {
     @RequiresReadLock
     private @Nullable VirtualFile findMainfileUnderReadLock() {
         Collection<VirtualFile> files = FilenameIndex.getVirtualFilesByName(
+                project,
                 "mainfile.php",
                 GlobalSearchScope.projectScope(project)
         );
@@ -78,6 +79,7 @@ public final class XoopsProjectService {
     @RequiresReadLock
     private @NotNull List<VirtualFile> findXoopsVersionFilesUnderReadLock() {
         Collection<VirtualFile> files = FilenameIndex.getVirtualFilesByName(
+                project,
                 "xoops_version.php",
                 GlobalSearchScope.projectScope(project)
         );
@@ -121,6 +123,7 @@ public final class XoopsProjectService {
     @RequiresReadLock
     private @Nullable VirtualFile findXoopsLibUnderReadLock() {
         Collection<VirtualFile> dirs = FilenameIndex.getVirtualFilesByName(
+                project,
                 "xoops_lib",
                 GlobalSearchScope.projectScope(project)
         );

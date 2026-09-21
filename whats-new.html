@@ -1,4 +1,18 @@
 <!doctype html>
+<h3>1.0.0 Alpha 3</h3>
+<p>Field-report fixes from wgSimpleAcc plus language-constant navigation and two new inspections.</p>
+<ul>
+  <li>Inspections no longer duplicate every finding (PHP+HTML PSI)</li>
+  <li>isResultSet quick-fix is safe in Inspect Code batch apply; early-exit guards cover <code>while (list = fetchRow)</code></li>
+  <li>ROOT_PATH guard: after <code>namespace</code>, accepts <code>die</code>, skips 404 stubs and admin/bootstrap entry points</li>
+  <li>Language constants from every <code>language/**/*.php</code>; Ctrl+B / Find Usages</li>
+  <li>Unregistered <code>.tpl</code> inspection; <code>XOBJ_DTYPE_UNICODE_*</code> rename quick-fix</li>
+</ul>
+<h3>1.0.0 Alpha 2</h3>
+<ul>
+  <li>On-demand Overview scan (no monorepo boot freeze); cancellable scans</li>
+  <li>Inspections under top-level <b>XOOPS</b> group</li>
+</ul>
 <h3>1.0.0 Alpha 1</h3>
 <p>First public alpha of <b>XOOPS Support</b>.</p>
 <ul>

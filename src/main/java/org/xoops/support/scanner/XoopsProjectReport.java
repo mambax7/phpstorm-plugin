@@ -7,7 +7,7 @@ public record XoopsProjectReport(
         boolean xoopsProject,
         Path projectRoot,
         Path webRoot,
-        CoreProfile profile,
+        CoreVersion coreVersion,
         List<XoopsModuleInfo> modules,
         List<XoopsFinding> findings
 ) {

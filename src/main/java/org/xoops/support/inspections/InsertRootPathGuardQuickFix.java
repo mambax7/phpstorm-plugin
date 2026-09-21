@@ -13,13 +13,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Inserts a file-leading XOOPS_ROOT_PATH guard after a leading PHP open tag.
- * Handles {@code <?php}, short {@code <?}, and {@code <?=} without double open tags.
+ * Inserts a XOOPS_ROOT_PATH guard after {@code <?php} / {@code declare} / {@code namespace},
+ * never before a namespace declaration (invalid PHP).
  */
 public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
 
     private static final String GUARD = "defined('XOOPS_ROOT_PATH') || exit('Restricted access');\n";
-    private static final Pattern OPEN_PHP = Pattern.compile("<\\?php\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern OPEN_ECHO = Pattern.compile("<\\?=", Pattern.CASE_INSENSITIVE);
     /** Short open tag: {@code <?} not followed by php, =, or xml (avoid XML prologs). */
     private static final Pattern OPEN_SHORT = Pattern.compile(
@@ -47,25 +46,22 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             return;
         }
         String text = document.getText();
-        if (XoopsRootPathGuardInspection.hasLeadingTerminatingGuard(text)) {
+        if (XoopsRootPathGuardPolicy.hasLeadingTerminatingGuard(text)) {
             return;
         }
 
-        // Prefer a file-leading <?php
-        Matcher php = OPEN_PHP.matcher(text);
-        if (php.find() && isLeadingTag(text, php.start())) {
-            insertGuardAfter(document, project, php.end());
+        int policyOffset = XoopsRootPathGuardPolicy.insertOffset(text);
+        if (policyOffset >= 0) {
+            insertGuardAt(document, project, policyOffset);
             return;
         }
 
-        // Leading short <? (not <?php / <?=): insert GUARD after the tag
         Matcher shortTag = OPEN_SHORT.matcher(text);
         if (shortTag.find() && isLeadingTag(text, shortTag.start())) {
-            insertGuardAfter(document, project, shortTag.end());
+            insertGuardAt(document, project, shortTag.end());
             return;
         }
 
-        // Leading <?= : insert a separate <?php guard block before it (no second short tag)
         Matcher echo = OPEN_ECHO.matcher(text);
         if (echo.find() && isLeadingTag(text, echo.start())) {
             document.insertString(echo.start(), "<?php\n" + GUARD + "?>\n");
@@ -73,12 +69,10 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
             return;
         }
 
-        // No recognized leading open tag — only prepend if file has no PHP open at all
         if (!text.contains("<?")) {
             document.insertString(0, "<?php\n" + GUARD);
             PsiDocumentManager.getInstance(project).commitDocument(document);
         }
-        // Otherwise decline rather than prepend a second opening tag mid-file.
     }
 
     private static boolean isLeadingTag(@NotNull String text, int tagStart) {
@@ -86,23 +80,19 @@ public final class InsertRootPathGuardQuickFix implements LocalQuickFix {
         return prefix.isBlank();
     }
 
-    private static void insertGuardAfter(
+    private static void insertGuardAt(
             @NotNull Document document,
             @NotNull Project project,
-            int tagEnd
+            int offset
     ) {
-        int insertAt = tagEnd;
+        int insertAt = Math.max(0, Math.min(offset, document.getTextLength()));
         CharSequence seq = document.getCharsSequence();
-        if (insertAt < seq.length() && seq.charAt(insertAt) == '\r') {
-            insertAt++;
+        String prefix = insertAt == 0 ? "" : String.valueOf(seq.charAt(insertAt - 1));
+        String toInsert = GUARD;
+        if (!prefix.isEmpty() && prefix.charAt(0) != '\n') {
+            toInsert = "\n" + GUARD;
         }
-        if (insertAt < seq.length() && seq.charAt(insertAt) == '\n') {
-            insertAt++;
-        } else {
-            document.insertString(insertAt, "\n");
-            insertAt++;
-        }
-        document.insertString(insertAt, GUARD);
+        document.insertString(insertAt, toInsert);
         PsiDocumentManager.getInstance(project).commitDocument(document);
     }
 }

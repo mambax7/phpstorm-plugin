@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -34,23 +35,23 @@ public final class XoopsProjectScanner {
             "smarty_compile", "templates_c", "uploads", "vendor", "xoops_data"
     );
 
-    private static final Pattern VERSION_25 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.5(?:\\.|[^0-9]|$)");
-    private static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.7(?:\\.|[^0-9]|$)");
-    private static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?4\\.0(?:\\.|[^0-9]|$)");
-    private static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
+    static final Pattern VERSION_25 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.5(?:\\.|[^0-9]|$)");
+    static final Pattern VERSION_27 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?2\\.7(?:\\.|[^0-9]|$)");
+    static final Pattern VERSION_40 = Pattern.compile("(?i)(?:XOOPS[ _-]?)?4\\.0(?:\\.|[^0-9]|$)");
+    static final Pattern REGISTERED_TEMPLATE = Pattern.compile(
             "(?is)['\"](?:file|template)['\"]\\s*=>\\s*['\"]([^'\"]+\\.tpl)['\"]"
     );
     private static final Pattern MANIFEST_DIRNAME = Pattern.compile(
             "(?is)(?:\\[['\"]dirname['\"]]\\s*=|['\"]dirname['\"]\\s*=>)\\s*['\"]([a-z0-9_-]+)['\"]"
     );
 
-    private static final Pattern RAW_REQUEST = Pattern.compile("\\$_REQUEST\\b");
-    private static final Pattern QUERY_F = Pattern.compile("->\\s*queryF\\s*\\(");
-    private static final Pattern QUOTE_STRING = Pattern.compile("->\\s*quoteString\\s*\\(");
-    private static final Pattern MUTATING_QUERY = Pattern.compile(
+    static final Pattern RAW_REQUEST = Pattern.compile("\\$_REQUEST\\b");
+    static final Pattern QUERY_F = Pattern.compile("->\\s*queryF\\s*\\(");
+    static final Pattern QUOTE_STRING = Pattern.compile("->\\s*quoteString\\s*\\(");
+    static final Pattern MUTATING_QUERY = Pattern.compile(
             "(?is)->\\s*query\\s*\\(\\s*['\"]\\s*(?:INSERT|UPDATE|DELETE|REPLACE|ALTER|CREATE|DROP|TRUNCATE)\\b"
     );
-    private static final Pattern WRONG_SMARTY = Pattern.compile(
+    static final Pattern WRONG_SMARTY = Pattern.compile(
             "(?i)(?<!<)\\{(?:\\$|/?(?:if|foreach|include|assign|block|literal)\\b)"
     );
 
@@ -63,7 +64,7 @@ public final class XoopsProjectScanner {
 
         if (!xoopsProject) {
             return new XoopsProjectReport(
-                    false, projectRoot, projectRoot, CoreProfile.NOT_XOOPS, List.of(), List.of()
+                    false, projectRoot, projectRoot, CoreVersion.NOT_XOOPS, List.of(), List.of()
             );
         }
 
@@ -84,11 +85,11 @@ public final class XoopsProjectScanner {
                 .comparing((XoopsFinding f) -> f.path().toString(), String.CASE_INSENSITIVE_ORDER)
                 .thenComparingInt(XoopsFinding::line));
 
-        CoreProfile profile = standaloneModule && !isCoreRoot(webRoot)
-                ? CoreProfile.MODULE_ONLY
-                : detectProfile(projectRoot, webRoot);
+        CoreVersion coreVersion = standaloneModule && !isCoreRoot(webRoot)
+                ? CoreVersion.MODULE_ONLY
+                : detectCoreVersion(projectRoot, webRoot);
 
-        return new XoopsProjectReport(true, projectRoot, webRoot, profile, modules, findings);
+        return new XoopsProjectReport(true, projectRoot, webRoot, coreVersion, modules, findings);
     }
 
     private static Path detectWebRoot(Path projectRoot) {
@@ -173,7 +174,7 @@ public final class XoopsProjectScanner {
         }
     }
 
-    private static CoreProfile detectProfile(Path projectRoot, Path webRoot) {
+    private static CoreVersion detectCoreVersion(Path projectRoot, Path webRoot) {
         // Prefer core include/version.php — composer.json dependency ranges often mislead (e.g. "2.5").
         for (Path candidate : List.of(
                 webRoot.resolve("include/version.php"),
@@ -185,13 +186,13 @@ public final class XoopsProjectScanner {
             }
             String text = body.get();
             if (VERSION_40.matcher(text).find()) {
-                return CoreProfile.XOOPS_40;
+                return CoreVersion.XOOPS_40;
             }
             if (VERSION_27.matcher(text).find()) {
-                return CoreProfile.XOOPS_27;
+                return CoreVersion.XOOPS_27;
             }
             if (VERSION_25.matcher(text).find()) {
-                return CoreProfile.XOOPS_25;
+                return CoreVersion.XOOPS_25;
             }
         }
         // Fallback: bind package name to its version constraint (not independent whole-file matches).
@@ -200,19 +201,19 @@ public final class XoopsProjectScanner {
             if (body.isEmpty()) {
                 continue;
             }
-            CoreProfile fromComposer = profileFromComposerJson(body.get());
-            if (fromComposer != CoreProfile.UNKNOWN) {
+            CoreVersion fromComposer = coreVersionFromComposerJson(body.get());
+            if (fromComposer != CoreVersion.UNKNOWN) {
                 return fromComposer;
             }
         }
-        return CoreProfile.UNKNOWN;
+        return CoreVersion.UNKNOWN;
     }
 
     /**
      * Match a single Composer require entry whose package name contains "xoops"
      * and apply version patterns only to that entry's constraint.
      */
-    private static CoreProfile profileFromComposerJson(@NotNull String json) {
+    private static CoreVersion coreVersionFromComposerJson(@NotNull String json) {
         // "xoops/something": "2.5.11" or "xoopsmodules/foo": "^2.7"
         Pattern entry = Pattern.compile(
                 "(?is)\"([^\"]*xoops[^\"]*)\"\\s*:\\s*\"([^\"]+)\""
@@ -226,16 +227,16 @@ public final class XoopsProjectScanner {
                 continue;
             }
             if (VERSION_40.matcher(constraint).find()) {
-                return CoreProfile.XOOPS_40;
+                return CoreVersion.XOOPS_40;
             }
             if (VERSION_27.matcher(constraint).find()) {
-                return CoreProfile.XOOPS_27;
+                return CoreVersion.XOOPS_27;
             }
             if (VERSION_25.matcher(constraint).find()) {
-                return CoreProfile.XOOPS_25;
+                return CoreVersion.XOOPS_25;
             }
         }
-        return CoreProfile.UNKNOWN;
+        return CoreVersion.UNKNOWN;
     }
 
     private void scanModule(Path moduleRoot, List<XoopsFinding> findings) {
@@ -308,26 +309,56 @@ public final class XoopsProjectScanner {
         }
     }
 
-    private static void checkRegisteredTemplates(Path moduleRoot, List<XoopsFinding> findings) {
+    static void checkRegisteredTemplates(Path moduleRoot, List<XoopsFinding> findings) {
         Path manifest = moduleRoot.resolve("xoops_version.php");
-        String content = readSmallFile(manifest).orElse(null);
-        if (content == null) {
+        String content = readSmallFile(manifest).orElse("");
+        Set<String> registered = new LinkedHashSet<>();
+        if (!content.isEmpty()) {
+            Matcher matcher = REGISTERED_TEMPLATE.matcher(content);
+            while (matcher.find()) {
+                String template = matcher.group(1).replace('\\', '/');
+                registered.add(template.toLowerCase(Locale.ROOT));
+                boolean exists = Files.isRegularFile(moduleRoot.resolve("templates").resolve(template))
+                        || Files.isRegularFile(moduleRoot.resolve("blocks").resolve(template))
+                        || Files.isRegularFile(moduleRoot.resolve(template));
+                if (!exists) {
+                    findings.add(new XoopsFinding(
+                            "MISSING_REGISTERED_TEMPLATE",
+                            manifest,
+                            lineAt(content, matcher.start(1)),
+                            "Registered template is missing: " + template
+                    ));
+                }
+            }
+        }
+        addUnregisteredTemplates(moduleRoot.resolve("templates"), registered, findings);
+        addUnregisteredTemplates(moduleRoot.resolve("blocks"), registered, findings);
+    }
+
+    private static void addUnregisteredTemplates(
+            Path directory,
+            Set<String> registered,
+            List<XoopsFinding> findings
+    ) {
+        if (!Files.isDirectory(directory)) {
             return;
         }
-        Matcher matcher = REGISTERED_TEMPLATE.matcher(content);
-        while (matcher.find()) {
-            String template = matcher.group(1).replace('\\', '/');
-            boolean exists = Files.isRegularFile(moduleRoot.resolve("templates").resolve(template))
-                    || Files.isRegularFile(moduleRoot.resolve("blocks").resolve(template))
-                    || Files.isRegularFile(moduleRoot.resolve(template));
-            if (!exists) {
-                findings.add(new XoopsFinding(
-                        "MISSING_REGISTERED_TEMPLATE",
-                        manifest,
-                        lineAt(content, matcher.start(1)),
-                        "Registered template is missing: " + template
-                ));
-            }
+        try (Stream<Path> paths = Files.walk(directory, 6)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".tpl"))
+                    .forEach(path -> {
+                        String relative = directory.relativize(path).toString().replace('\\', '/');
+                        if (!registered.contains(relative.toLowerCase(Locale.ROOT))) {
+                            findings.add(new XoopsFinding(
+                                    "UNREGISTERED_TEMPLATE",
+                                    path,
+                                    1,
+                                    "Template is not registered in xoops_version.php: " + relative
+                            ));
+                        }
+                    });
+        } catch (IOException ignored) {
+            // skip unreadable template trees
         }
     }
 

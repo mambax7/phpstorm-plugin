@@ -3,23 +3,32 @@
 <idea-plugin>
     <id>org.xoops.plugin.support</id>
     <name>XOOPS Support</name>
-    <version>1.0.0-alpha.2</version>
+    <!-- version is patched from gradle.properties (pluginVersion) — do not duplicate it here. -->
     <vendor url="https://github.com/XOOPS/phpstorm-plugin" email="dev@xoops.org">XOOPS Project</vendor>
 
     <!-- since-build/until-build are patched from gradle.properties (until open-ended for 2026.2+). -->
 
     <description><![CDATA[
-        <p><b>XOOPS Support</b> — PhpStorm / IntelliJ helper for XOOPS 2.5 / 2.7 / 4.0 module and core work.</p>
-        <p><i>1.0.0 Alpha 2</i> — on-demand overview scan; inspections under top-level XOOPS group.</p>
+        <p><b>XOOPS Support</b> — PhpStorm / IntelliJ helper for XOOPS 2.5 / 2.7 / 4.0 Core and module development.</p>
+        <p><i>1.0.0 Alpha 3</i> — Goffy field-report fixes; language-constant navigation; unregistered templates; UNICODE dtype.</p>
         <ul>
           <li>Project detection, scanner, and HTML overview tool window</li>
           <li>Inspections with Alt+Enter quick fixes (guards, query/exec, Request, Smarty, templates)</li>
-          <li>Live templates, language-constant completion, hybrid module scaffold</li>
+          <li>Live templates, language-constant completion <b>and Ctrl+B</b>, hybrid module scaffold</li>
           <li>Dynamic install/update (no IDE restart when unload succeeds)</li>
         </ul>
     ]]></description>
 
     <change-notes><![CDATA[
+        <h3>1.0.0 Alpha 3 (1.0.0-alpha.3)</h3>
+        <ul>
+          <li>Goffy / wgSimpleAcc: inspections no longer report every finding twice (PHP+HTML PSI).</li>
+          <li>isResultSet quick-fix uses the current PSI statement (Inspect Code batch apply works); early-exit guards cover <code>while (list = fetchRow)</code>.</li>
+          <li>ROOT_PATH guard: recognize <code>die</code> after <code>namespace</code>/<code>use</code>; insert after namespace; skip 404 stubs, admin entry points, and mainfile/header bootstraps.</li>
+          <li>Language constants: scan every <code>language/**/*.php</code>; Ctrl+B / Find Usages on <code>_MD_*</code> (and MI/AM/CO/MB).</li>
+          <li>Unregistered <code>.tpl</code> inspection (inverse of missing registered template).</li>
+          <li><code>XOBJ_DTYPE_UNICODE_*</code> deprecation with rename quick-fix (off when Core Version is 2.5).</li>
+        </ul>
         <h3>1.0.0 Alpha 2 (1.0.0-alpha.2)</h3>
         <ul>
           <li><b>Performance:</b> Overview no longer auto-scans the whole module tree when the tool window opens (monorepo boot freeze). Click <b>Refresh</b> to scan. Optional setting re-enables auto-scan.</li>
@@ -37,6 +46,9 @@
         </ul>
     ]]></change-notes>
 
+    <!-- PHP is mandatory. Marketplace Plugin Verifier against IntelliJ IDEA (IU)
+         reports "missing mandatory dependency" unless the PHP plugin is included
+         in that run — schedule PhpStorm (PS), not IDEA. -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.jetbrains.php</depends>
 
@@ -131,6 +143,23 @@
                 displayName="Wrong Smarty delimiter (use XOOPS &lt;{ }&gt;)"
                 shortName="XoopsWrongSmartyDelimiter"/>
 
+        <localInspection
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsUnregisteredTemplateInspection"
+                displayName="Template on disk not registered in xoops_version.php"
+                shortName="XoopsUnregisteredTemplate"/>
+
+        <localInspection
+                language="PHP"
+                groupName="XOOPS"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="org.xoops.support.inspections.XoopsDeprecatedUnicodeDtypeInspection"
+                displayName="Deprecated XOBJ_DTYPE_UNICODE_* constant"
+                shortName="XoopsDeprecatedUnicodeDtype"/>
+
         <completion.contributor
                 language="PHP"
                 implementationClass="org.xoops.support.completion.XoopsLanguageConstantCompletionContributor"/>
@@ -139,6 +168,13 @@
         <completion.contributor
                 language="Smarty"
                 implementationClass="org.xoops.support.completion.XoopsLanguageConstantCompletionContributor"/>
+
+        <psi.referenceContributor
+                language="PHP"
+                implementation="org.xoops.support.completion.XoopsLanguageConstantReferenceContributor"/>
+        <psi.referenceContributor
+                language="Smarty"
+                implementation="org.xoops.support.completion.XoopsLanguageConstantReferenceContributor"/>
     </extensions>
 
     <actions>

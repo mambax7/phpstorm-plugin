@@ -69,14 +69,12 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             "(?is)^\\s*(return|throw|exit|die|break|continue)\\b[^;{]*;?\\s*$"
     );
 
-    private static final String FAIL_ACTION = "throw new \\RuntimeException('Database query failed');";
-
     @Override
     public @NotNull PsiElementVisitor buildVisitor(@NotNull ProblemsHolder holder, boolean isOnTheFly) {
         return new PsiElementVisitor() {
             @Override
             public void visitFile(@NotNull PsiFile file) {
-                if (!XoopsSupportPlugin.isEnabled(file)) {
+                if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
                     return;
                 }
                 if (!PhpTextUtil.isPhpFile(file) || PhpTextUtil.looksLikeVendorOrCache(file)) {
@@ -101,29 +99,13 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                             "XOOPS: call isResultSet($result) (and prefer mysqli_result check) before fetch*";
                     Statement stmt = PsiTreeUtil.getParentOfType(leaf, Statement.class, false);
                     if (stmt == null) {
-                        // No safe statement boundary — report without auto-fix.
                         holder.registerProblem(leaf, message);
                         continue;
                     }
-                    int insertAt = stmt.getTextRange().getStartOffset();
-                    String indentGuess = guessIndent(text, insertAt);
-                    String block = indentGuess + "if (!" + dbExpr + "->isResultSet(" + resultVar
-                            + ") || !" + resultVar + " instanceof \\mysqli_result) {\n"
-                            + indentGuess + "    " + FAIL_ACTION + "\n"
-                            + indentGuess + "}\n";
-                    String expectedAt = text.substring(
-                            insertAt,
-                            Math.min(text.length(), insertAt + Math.min(32, stmt.getTextLength()))
-                    );
                     holder.registerProblem(
                             leaf,
                             message,
-                            new InsertBeforeOffsetQuickFix(
-                                    "Insert isResultSet guard before fetch",
-                                    insertAt,
-                                    block,
-                                    expectedAt
-                            )
+                            new InsertBeforeStatementQuickFix(dbExpr, resultVar)
                     );
                 }
             }
@@ -146,17 +128,90 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             return false;
         }
 
-        IfCond last = before.get(before.size() - 1);
-        // Early-exit: only when every fall-through path implies isResultSet($var).
-        // Requires pure-enough negation (no top-level &&) + single exit body.
-        if (last.ifEnd <= fetchOffset
-                && isOnlyWhitespace(code.substring(last.ifEnd, fetchOffset))
-                && isSafeEarlyExitCondition(last.condition, resultVar)
-                && bodyIsSimpleEarlyExit(code, last)) {
+        if (isInsidePositiveIsResultSetGuard(code, fetchOffset, resultVar, before)) {
             return true;
         }
 
-        return isInsidePositiveIsResultSetGuard(code, fetchOffset, resultVar, before);
+        // Dominating early-exit: a proven !isResultSet($var) throw/return covers later
+        // fetch* of $var (including while/for conditions) until $var is reassigned,
+        // a nested function appears, or a '}' closes the enclosing block.
+        for (int i = before.size() - 1; i >= 0; i--) {
+            IfCond ic = before.get(i);
+            if (ic.ifEnd > fetchOffset) {
+                continue;
+            }
+            if (!isSafeEarlyExitCondition(ic.condition, resultVar) || !bodyIsSimpleEarlyExit(code, ic)) {
+                continue;
+            }
+            if (assignsResultVar(code, ic.ifEnd, fetchOffset, resultVar)) {
+                continue;
+            }
+            if (closesOutOfScope(code, ic.ifEnd, fetchOffset) || hasFunctionKeyword(code, ic.ifEnd, fetchOffset)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Visible for tests: unguarded {@code fetch*} start offsets in {@code text}.
+     */
+    static @NotNull List<Integer> unguardedFetchOffsets(@NotNull String text) {
+        String code = PhpTextUtil.maskCommentsAndStrings(text);
+        List<IfCond> allIfs = findIfConditions(code);
+        List<Integer> out = new ArrayList<>();
+        Matcher m = FETCH.matcher(code);
+        while (m.find()) {
+            String resultVar = m.group(3);
+            if (!isFetchAlreadyGuarded(code, m.start(), resultVar, allIfs)) {
+                out.add(m.start());
+            }
+        }
+        return out;
+    }
+
+    private static boolean assignsResultVar(
+            @NotNull String code,
+            int from,
+            int to,
+            @NotNull String resultVar
+    ) {
+        Pattern assign = Pattern.compile(Pattern.quote(resultVar) + "(?![\\w])\\s*=(?![=|>])");
+        Matcher m = assign.matcher(code);
+        while (m.find()) {
+            if (m.start() >= from && m.start() < to) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean closesOutOfScope(@NotNull String code, int from, int to) {
+        int depth = 0;
+        int end = Math.min(to, code.length());
+        for (int i = from; i < end; i++) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth < 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasFunctionKeyword(@NotNull String code, int from, int to) {
+        Matcher m = Pattern.compile("\\bfunction\\b", Pattern.CASE_INSENSITIVE).matcher(code);
+        while (m.find()) {
+            if (m.start() >= from && m.start() < to) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static @NotNull List<IfCond> findIfConditions(@NotNull String text) {
@@ -226,15 +281,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             }
         }
         return -1;
-    }
-
-    private static boolean isOnlyWhitespace(@NotNull String s) {
-        for (int i = 0; i < s.length(); i++) {
-            if (!Character.isWhitespace(s.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
@@ -400,20 +446,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             }
         }
         return false;
-    }
-
-    private static String guessIndent(String text, int offset) {
-        int start = lineStart(text, offset);
-        int i = start;
-        while (i < text.length() && (text.charAt(i) == ' ' || text.charAt(i) == '\t')) {
-            i++;
-        }
-        return text.substring(start, i);
-    }
-
-    private static int lineStart(String text, int offset) {
-        int i = text.lastIndexOf('\n', Math.max(0, offset - 1));
-        return i < 0 ? 0 : i + 1;
     }
 
     private record IfCond(

@@ -22,7 +22,7 @@ public final class XoopsSettingsState implements PersistentStateComponent<XoopsS
      */
     public boolean autoScanOnToolWindowOpen = false;
     /** Auto | 2.5 | 2.7 | 4.0 */
-    public String coreProfile = "Auto";
+    public String coreVersion = "Auto";
     public String tablePrefix = "";
 
     public static @NotNull XoopsSettingsState getInstance(@NotNull Project project) {
