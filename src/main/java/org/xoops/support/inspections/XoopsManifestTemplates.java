@@ -48,17 +48,23 @@ public final class XoopsManifestTemplates {
      *                      ({@link PhpTextUtil#maskCommentsOnly(String)}); offsets are preserved
      */
     public static @NotNull List<Registration> find(@NotNull String commentMasked) {
+        String code = PhpTextUtil.maskCommentsAndStrings(commentMasked);
         List<Registration> out = new ArrayList<>();
         Set<Integer> seen = new LinkedHashSet<>();
         Matcher stmt = MODVERSION_TEMPLATES.matcher(commentMasked);
         int searchFrom = 0;
         while (stmt.find(searchFrom)) {
+            if (code.charAt(stmt.start()) != '$') {
+                searchFrom = stmt.end();
+                continue;
+            }
             int end = statementEnd(commentMasked, stmt.end());
             Section section = "blocks".equalsIgnoreCase(stmt.group(1)) ? Section.BLOCKS : Section.TEMPLATES;
             Matcher m = FILE_OR_TEMPLATE.matcher(commentMasked);
             m.region(stmt.end(), end);
             while (m.find()) {
-                if (seen.add(m.start(1))) {
+                int assignment = commentMasked.indexOf('=', m.start());
+                if (code.charAt(assignment) == '=' && seen.add(m.start(1))) {
                     out.add(new Registration(m.group(1).replace('\\', '/'), m.start(1), section));
                 }
             }

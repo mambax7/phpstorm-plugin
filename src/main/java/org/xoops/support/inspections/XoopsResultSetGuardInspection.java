@@ -469,6 +469,9 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
      * parenthesized forms).
      */
     private static boolean isSafePositiveGuardCondition(@NotNull String cond, @NotNull String resultVar) {
+        if (hasUnprovenPolarity(cond)) {
+            return false;
+        }
         if (!conditionMentionsIsResultSet(cond, resultVar)) {
             return false;
         }
@@ -487,12 +490,26 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
      * parenthesized forms) where exit is conditional.
      */
     private static boolean isSafeEarlyExitCondition(@NotNull String cond, @NotNull String resultVar) {
+        if (hasUnprovenPolarity(cond)) {
+            return false;
+        }
         if (!conditionNegatesIsResultSet(cond, resultVar)) {
             return false;
         }
         // Reject AND-paths at any depth that make the exit conditional on other predicates,
         // and xor, which can be false while !isResultSet($var) is true.
         return !hasBoolOpAnywhere(cond, false) && !hasXorAnywhere(cond);
+    }
+
+    private static boolean hasUnprovenPolarity(@NotNull String condition) {
+        // ponytail: comparisons and ternaries need expression analysis; report rather than guess.
+        String operators = condition.replace("->", "");
+        for (int i = 0; i < operators.length(); i++) {
+            if ("=<>?:".indexOf(operators.charAt(i)) >= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isInsidePositiveIsResultSetGuard(

@@ -6,10 +6,12 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
@@ -18,7 +20,6 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.CachedValue;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
-import com.intellij.psi.util.PsiModificationTracker;
 import com.intellij.util.concurrency.annotations.RequiresReadLock;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,7 +36,7 @@ import java.util.Set;
 
 /**
  * Project-level cache of XOOPS language constants from every PHP file under
- * {@code language/}. Tied to {@link PsiModificationTracker#MODIFICATION_COUNT};
+ * {@code language/}. Depends on language PSI files and relevant VFS changes;
  * VFS listener parent is this service (not the project) so plugin unload disposes it.
  */
 @Service(Service.Level.PROJECT)
@@ -47,6 +48,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
     private static final int MAX_CONSTANTS = 5000;
 
     private final Project project;
+    private final SimpleModificationTracker languageChanges = new SimpleModificationTracker();
     private volatile boolean disposed;
 
     public XoopsLanguageConstantsCache(@NotNull Project project) {
@@ -59,7 +61,15 @@ public final class XoopsLanguageConstantsCache implements Disposable {
                     boolean hit = false;
                     for (VFileEvent event : events) {
                         VirtualFile file = event.getFile();
-                        if (file != null && XoopsLanguageConstantParser.isLanguagePath(file.getPath())) {
+                        // ponytail: directory events conservatively invalidate; subtree tracking only if needed.
+                        if (file != null && (file.isDirectory()
+                                || XoopsLanguageConstantParser.isLanguagePath(file.getPath()))) {
+                            hit = true;
+                            break;
+                        }
+                        if (event instanceof VFileMoveEvent move
+                                && XoopsLanguageConstantParser.isLanguagePath(
+                                        move.getNewParent().getPath() + "/" + move.getFile().getName())) {
                             hit = true;
                             break;
                         }
@@ -91,7 +101,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
 
     public void invalidate() {
         if (!project.isDisposed()) {
-            project.putUserData(CACHE_KEY, null);
+            languageChanges.incModificationCount();
         }
     }
 
@@ -135,7 +145,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
     @Override
     public void dispose() {
         disposed = true;
-        invalidate();
+        project.putUserData(CACHE_KEY, null);
     }
 
     private @Nullable Index getIndex() {
@@ -150,10 +160,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
                 CachedValue<Index> cached = project.getUserData(CACHE_KEY);
                 if (cached == null) {
                     cached = CachedValuesManager.getManager(project).createCachedValue(
-                            () -> CachedValueProvider.Result.create(
-                                    collectUnderReadLock(),
-                                    PsiModificationTracker.MODIFICATION_COUNT
-                            ),
+                            this::collectUnderReadLock,
                             false
                     );
                     project.putUserData(CACHE_KEY, cached);
@@ -166,7 +173,9 @@ public final class XoopsLanguageConstantsCache implements Disposable {
     }
 
     @RequiresReadLock
-    private @NotNull Index collectUnderReadLock() {
+    private @NotNull CachedValueProvider.Result<Index> collectUnderReadLock() {
+        List<Object> dependencies = new ArrayList<>();
+        dependencies.add(languageChanges);
         Set<String> names = new LinkedHashSet<>();
         Map<String, List<Def>> defs = new LinkedHashMap<>();
         PsiManager psiManager = PsiManager.getInstance(project);
@@ -181,6 +190,8 @@ public final class XoopsLanguageConstantsCache implements Disposable {
             if (psi == null) {
                 continue;
             }
+            // PSI dependencies include committed editor changes, even before saving to disk.
+            dependencies.add(psi);
             for (XoopsLanguageConstantParser.Occurrence occ : XoopsLanguageConstantParser.parse(psi.getText())) {
                 if (!names.contains(occ.name()) && names.size() >= MAX_CONSTANTS) {
                     continue; // cap new names; definitions of known names are still recorded
@@ -189,7 +200,8 @@ public final class XoopsLanguageConstantsCache implements Disposable {
                 defs.computeIfAbsent(occ.name(), k -> new ArrayList<>()).add(new Def(vf, occ.offset()));
             }
         }
-        return new Index(Collections.unmodifiableSet(names), Map.copyOf(defs));
+        return CachedValueProvider.Result.create(
+                new Index(Collections.unmodifiableSet(names), Map.copyOf(defs)), dependencies.toArray());
     }
 
     /** Same module and /english/ first, then same module, then any /english/, then the first. */
@@ -198,7 +210,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
         Def english = null;
         for (Def d : defs) {
             String path = d.file.getPath().replace('\\', '/').toLowerCase(Locale.ROOT);
-            boolean inModule = moduleSegment != null && path.contains(moduleSegment);
+            boolean inModule = moduleSegment != null && moduleSegment.equals(moduleSegment(path));
             boolean isEnglish = path.contains("/english/");
             if (inModule && isEnglish) {
                 return d;
@@ -216,7 +228,7 @@ public final class XoopsLanguageConstantsCache implements Disposable {
     /** {@code /modules/<dirname>/} of a path, lower-case, or null when not under modules/. */
     static @Nullable String moduleSegment(@NotNull String path) {
         String p = path.replace('\\', '/').toLowerCase(Locale.ROOT);
-        int i = p.indexOf("/modules/");
+        int i = p.lastIndexOf("/modules/");
         if (i < 0) {
             return null;
         }

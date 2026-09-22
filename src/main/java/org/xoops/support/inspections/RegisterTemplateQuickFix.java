@@ -60,8 +60,9 @@ public final class RegisterTemplateQuickFix implements LocalQuickFix {
                 + "    'description' => '',\n"
                 + "];\n";
         int insertAt = text.length();
-        int closePhp = text.lastIndexOf("?>");
-        if (closePhp >= 0 && text.substring(closePhp).trim().equals("?>")) {
+        String code = PhpTextUtil.maskCommentsAndStrings(text);
+        int closePhp = code.lastIndexOf("?>");
+        if (closePhp >= 0 && code.lastIndexOf("<?") < closePhp) {
             insertAt = closePhp;
         }
         document.insertString(insertAt, entry);
