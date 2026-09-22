@@ -241,7 +241,7 @@ A `.tpl` file under the module `templates/` or `blocks/` directory is not listed
 
 **Why.** The `db:` template resource resolves through the `tplfile` table, and only registered templates get a row. An unregistered `.tpl` renders fine from the file system on a stock template set during development, then breaks on a site whose template set was imported, or on the first module update that resyncs templates. Registering it at creation time removes the surprise.
 
-**Matching.** A manifest entry may be spelled relative to `templates/` (`demo_index.tpl`, the XOOPS convention) or from the module root (`templates/demo_index.tpl`); both are accepted. Names are compared case-insensitively.
+**Matching.** A manifest entry may be spelled relative to `templates/` (`demo_index.tpl`, the XOOPS convention) or from the module root (`templates/demo_index.tpl`); both are accepted. Case-insensitive matching identifies the registration, but filename and directory spelling must match the disk exactly. The missing-template inspection and scanner report casing differences as a case mismatch, not a missing or unregistered template.
 
 **Quick-fix** appends this at the end of the manifest (before a trailing `?>` if there is one), unless the name is already quoted somewhere in the file:
 

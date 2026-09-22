@@ -64,6 +64,10 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             "(?is)!\\s*\\(?\\s*(\\$[A-Za-z_][\\w]*)\\s*instanceof"
     );
 
+    private static final Pattern INSTANCEOF_RESULT = Pattern.compile(
+            "(?is)\\$[A-Za-z_][\\w]*\\s+instanceof\\s+\\\\?mysqli_result"
+    );
+
     /** Single exit statement only (no nested control structure). */
     private static final Pattern SIMPLE_EARLY_EXIT = Pattern.compile(
             "(?is)^\\s*(return|throw|exit|die|break|continue)\\b[^;{]*;?\\s*$"
@@ -162,7 +166,7 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
     ) {
         for (int i = before.size() - 1; i >= 0; i--) {
             IfCond ic = before.get(i);
-            if (ic.ifEnd > fetchOffset || ic.chained) {
+            if (ic.ifEnd > fetchOffset || ic.chained || !startsAtStatementBoundary(code, ic.ifStart)) {
                 // An elseif / else-if branch is skipped whenever an earlier branch matched,
                 // so its early exit proves nothing about the fall-through path.
                 continue;
@@ -193,6 +197,17 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
             }
         }
         return out;
+    }
+
+    private static boolean startsAtStatementBoundary(@NotNull String code, int start) {
+        int previous = start - 1;
+        while (previous >= 0 && Character.isWhitespace(code.charAt(previous))) {
+            previous--;
+        }
+        // ponytail: only standalone statements prove dominance; labels/alternative syntax need PSI.
+        return previous < 0 || ";{}".indexOf(code.charAt(previous)) >= 0
+                || previous >= 4 && code.regionMatches(true, previous - 4, "<?php", 0, 5)
+                || previous >= 1 && code.regionMatches(previous - 1, "<?", 0, 2);
     }
 
     private static boolean assignsResultVar(
@@ -502,11 +517,34 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
     }
 
     private static boolean hasUnprovenPolarity(@NotNull String condition) {
-        // ponytail: comparisons and ternaries need expression analysis; report rather than guess.
-        String operators = condition.replace("->", "");
+        // ponytail: only simple negated atoms are proven; other expression forms need PSI.
+        String operators = condition;
         for (int i = 0; i < operators.length(); i++) {
+            if (operators.charAt(i) == '>' && i > 0 && operators.charAt(i - 1) == '-') {
+                continue;
+            }
             if ("=<>?:".indexOf(operators.charAt(i)) >= 0) {
                 return true;
+            }
+            if (operators.charAt(i) == '!') {
+                int next = i + 1;
+                while (next < operators.length() && Character.isWhitespace(operators.charAt(next))) {
+                    next++;
+                }
+                if (next < operators.length() && operators.charAt(next) == '!') {
+                    return true;
+                }
+                if (next < operators.length() && operators.charAt(next) == '(') {
+                    int close = matchingCloseParen(operators, next);
+                    if (close < 0) {
+                        return true;
+                    }
+                    String group = operators.substring(next + 1, close);
+                    if (!NEG_IS_RESULT_SET.matcher(operators.substring(i, close + 1)).matches()
+                            && !INSTANCEOF_RESULT.matcher(group.strip()).matches()) {
+                        return true;
+                    }
+                }
             }
         }
         return false;

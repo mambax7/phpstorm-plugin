@@ -79,4 +79,14 @@ public final class LanguageCacheRegressionTest extends BasePlatformTestCase {
         });
         assertTrue(cache.getConstants().contains("_MI_FIRST"));
     }
+    public void testRenameIntoPhpInvalidatesCache() {
+        var file = myFixture.addFileToProject("modules/news/language/english/main.txt", "<?php define('_MI_RENAMED', 'Renamed');");
+        var cache = XoopsLanguageConstantsCache.getInstance(getProject());
+        assertTrue(cache.getConstants().isEmpty());
+        WriteCommandAction.runWriteCommandAction(getProject(), () -> {
+            try { file.getVirtualFile().rename(this, "main.php"); }
+            catch (java.io.IOException e) { throw new RuntimeException(e); }
+        });
+        assertTrue(cache.getConstants().contains("_MI_RENAMED"));
+    }
 }

@@ -43,4 +43,20 @@ public final class ReviewRegressionTest extends BasePlatformTestCase {
                     XoopsManifestTemplates.keys(manifest.getText()));
         }
     }
+    public void testTemplateCaseMismatchIsReportedWithoutCreateFix() {
+        var manifest = myFixture.addFileToProject("case-module/xoops_version.php",
+                "<?php $modversion['templates'][] = ['file' => 'Admin/Foo.tpl'];");
+        var template = myFixture.addFileToProject("case-module/templates/admin/foo.tpl", "template");
+        var holder = new com.intellij.codeInspection.ProblemsHolder(
+                InspectionManager.getInstance(getProject()), manifest, false);
+        new XoopsMissingRegisteredTemplateInspection().buildVisitor(holder, false).visitFile(manifest);
+        assertEquals(1, holder.getResults().size());
+        assertTrue(holder.getResults().get(0).getDescriptionTemplate().contains("case mismatch"));
+        var fixes = holder.getResults().get(0).getFixes();
+        assertTrue(fixes == null || fixes.length == 0);
+        var inverse = new com.intellij.codeInspection.ProblemsHolder(
+                InspectionManager.getInstance(getProject()), template, false);
+        new XoopsUnregisteredTemplateInspection().buildVisitor(inverse, false).visitFile(template);
+        assertTrue(inverse.getResults().isEmpty());
+    }
 }

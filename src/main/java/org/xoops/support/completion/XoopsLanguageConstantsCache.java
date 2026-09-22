@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
@@ -70,6 +71,11 @@ public final class XoopsLanguageConstantsCache implements Disposable {
                         if (event instanceof VFileMoveEvent move
                                 && XoopsLanguageConstantParser.isLanguagePath(
                                         move.getNewParent().getPath() + "/" + move.getFile().getName())) {
+                            hit = true;
+                            break;
+                        }
+                        if (event instanceof VFilePropertyChangeEvent rename
+                                && XoopsLanguageConstantParser.isLanguagePath(rename.getNewPath())) {
                             hit = true;
                             break;
                         }

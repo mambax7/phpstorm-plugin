@@ -276,4 +276,40 @@ public final class XoopsProjectScannerTest {
                     });
         }
     }
+    @Test
+    public void templateCaseMismatchIsNeitherMissingNorUnregistered() throws Exception {
+        Path root = Files.createTempDirectory("xoops-template-case");
+        try {
+            Files.createDirectories(root.resolve("templates/admin"));
+            Files.writeString(root.resolve("templates/admin/foo.tpl"), "template");
+            Files.writeString(root.resolve("xoops_version.php"),
+                    "<?php $modversion['templates'][] = ['file' => 'Admin/Foo.tpl'];");
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(root, findings);
+            assertEquals(1, findings.size());
+            assertEquals("TEMPLATE_CASE_MISMATCH", findings.get(0).kind());
+            Files.writeString(root.resolve("xoops_version.php"),
+                    "<?php $modversion['templates'][] = ['file' => 'admin/foo.tpl'];");
+            findings.clear();
+            XoopsProjectScanner.checkRegisteredTemplates(root, findings);
+            assertTrue(findings.isEmpty());
+        } finally {
+            deleteRecursively(root);
+        }
+    }
+    @Test
+    public void harmlessPathComponentsDoNotCreateTemplateFindings() throws Exception {
+        Path root = Files.createTempDirectory("xoops-template-dots");
+        try {
+            Files.createDirectories(root.resolve("templates/admin"));
+            Files.writeString(root.resolve("templates/admin/foo.tpl"), "template");
+            Files.writeString(root.resolve("xoops_version.php"),
+                    "<?php $modversion['templates'][] = ['file' => './admin//./foo.tpl'];");
+            List<XoopsFinding> findings = new ArrayList<>();
+            XoopsProjectScanner.checkRegisteredTemplates(root, findings);
+            assertTrue(findings.toString(), findings.isEmpty());
+        } finally {
+            deleteRecursively(root);
+        }
+    }
 }

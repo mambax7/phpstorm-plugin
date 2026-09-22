@@ -37,9 +37,15 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 String code = PhpTextUtil.maskCommentsOnly(text);
                 for (XoopsManifestTemplates.Registration reg : XoopsManifestTemplates.find(code)) {
                     String template = reg.name();
-                    boolean exists = childExists(moduleRoot,
-                            XoopsManifestTemplates.diskPath(template, reg.block()));
-                    if (!exists) {
+                    String expected = XoopsManifestTemplates.diskPath(template, reg.block());
+                    String actual = XoopsTemplatePaths.existingPath(moduleRoot, expected);
+                    if (actual != null && !expected.equals(actual)) {
+                        PsiElement leaf = PhpTextUtil.leafAt(file, reg.nameOffset());
+                        if (leaf != null) {
+                            holder.registerProblem(leaf,
+                                    "XOOPS: template filename case mismatch: " + expected + " (on disk: " + actual + ")");
+                        }
+                    } else if (actual == null) {
                         PsiElement leaf = PhpTextUtil.leafAt(file, reg.nameOffset());
                         if (leaf != null) {
                             holder.registerProblem(
@@ -54,15 +60,4 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
         };
     }
 
-    private static boolean childExists(VirtualFile root, String relative) {
-        String[] parts = relative.split("/");
-        VirtualFile cur = root;
-        for (String part : parts) {
-            if (cur == null) {
-                return false;
-            }
-            cur = cur.findChild(part);
-        }
-        return cur != null && !cur.isDirectory();
-    }
 }

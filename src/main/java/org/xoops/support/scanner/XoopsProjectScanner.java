@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.xoops.support.inspections.PhpTextUtil;
 import org.xoops.support.inspections.XoopsManifestTemplates;
+import org.xoops.support.inspections.XoopsTemplatePaths;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -368,8 +369,18 @@ public final class XoopsProjectScanner {
                 String template = reg.name();
                 String relative = XoopsManifestTemplates.diskPath(template, reg.block());
                 registered.add(relative.toLowerCase(Locale.ROOT));
-                boolean exists = Files.isRegularFile(moduleRoot.resolve(relative));
-                if (!exists) {
+                String actual;
+                try {
+                    actual = XoopsTemplatePaths.existingPath(moduleRoot, relative);
+                } catch (IOException | UncheckedIOException exception) {
+                    findings.add(scanError(manifest, "Could not locate template: " + exception.getMessage()));
+                    continue;
+                }
+                if (actual != null && !relative.equals(actual)) {
+                    findings.add(new XoopsFinding(
+                            "TEMPLATE_CASE_MISMATCH", manifest, lineAt(content, reg.nameOffset()),
+                            "Template filename case mismatch: " + relative + " (on disk: " + actual + ")"));
+                } else if (actual == null) {
                     findings.add(new XoopsFinding(
                             "MISSING_REGISTERED_TEMPLATE",
                             manifest,

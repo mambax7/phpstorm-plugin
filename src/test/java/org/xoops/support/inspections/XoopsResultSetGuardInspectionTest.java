@@ -242,4 +242,36 @@ public final class XoopsResultSetGuardInspectionTest {
         assertFalse(InsertBeforeStatementQuickFix.assignsResultBeforeFetch(
                 source, source.indexOf("log("), source.indexOf("$db->fetchArray"), "$result"));
     }
+    @Test
+    public void nestedNegationsDoNotProveAnEarlyExit() {
+        for (String condition : new String[]{"!!$db->isResultSet($result)",
+                "!(!$db->isResultSet($result))", "!($other || !$db->isResultSet($result))",
+                "!!($result instanceof \\mysqli_result)"}) {
+            assertEquals(condition, 1, XoopsResultSetGuardInspection.unguardedFetchOffsets(
+                    "<?php if (" + condition + ") return; $db->fetchArray($result);").size());
+        }
+    }
+
+    @Test
+    public void unbracedControlBodiesDoNotDominateLaterFetches() {
+        for (String prefix : new String[]{"if ($enabled)", "while ($enabled)",
+                "foreach ($items as $item)", "for ($i = 0; $i < 2; $i++)"}) {
+            String source = "<?php " + prefix + " if (!$db->isResultSet($result)) return; $db->fetchArray($result);";
+            assertEquals(prefix, 1, XoopsResultSetGuardInspection.unguardedFetchOffsets(source).size());
+            assertFalse(prefix, XoopsResultSetGuardInspection.isFetchGuardedAt(source,
+                    source.indexOf("$db->fetchArray"), "$result"));
+        }
+        assertTrue(XoopsResultSetGuardInspection.unguardedFetchOffsets(
+                "<?php if ($enabled) { if (!$db->isResultSet($result)) return; $db->fetchArray($result); }").isEmpty());
+    }
+    @Test
+    public void unrecognizedNegatedGroupsDoNotProvePositiveGuards() {
+        for (String condition : new String[]{"!(($db->isResultSet($result)))",
+                "!($other || $db->isResultSet($result))"}) {
+            assertEquals(condition, 1, XoopsResultSetGuardInspection.unguardedFetchOffsets(
+                    "<?php if (" + condition + ") { $db->fetchArray($result); }").size());
+        }
+        assertTrue(XoopsResultSetGuardInspection.unguardedFetchOffsets(
+                "<?php if (!($db->isResultSet($result))) return; $db->fetchArray($result);").isEmpty());
+    }
 }

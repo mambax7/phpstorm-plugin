@@ -3,6 +3,7 @@ package org.xoops.support.inspections;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -90,10 +91,8 @@ public final class XoopsManifestTemplates {
      * Bare block names go under {@code templates/blocks/}; already-prefixed names stay as spelled.
      */
     public static @NotNull String diskPath(@NotNull String name, boolean block) {
-        String n = name.replace('\\', '/');
-        while (n.startsWith("/")) {
-            n = n.substring(1);
-        }
+        String n = String.join("/", Arrays.stream(name.replace('\\', '/').split("/"))
+                .filter(part -> !part.isEmpty() && !part.equals(".")).toList());
         if (n.startsWith("templates/") || n.startsWith("blocks/")) {
             return n;
         }
