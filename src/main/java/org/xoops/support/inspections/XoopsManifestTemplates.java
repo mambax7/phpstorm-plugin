@@ -22,6 +22,8 @@ import java.util.regex.Pattern;
  */
 public final class XoopsManifestTemplates {
 
+    private static final String TEMPLATES_PREFIX = "templates/";
+
     public enum Section {
         TEMPLATES,
         BLOCKS
@@ -95,17 +97,17 @@ public final class XoopsManifestTemplates {
         String n = String.join("/", Arrays.stream(name.replace('\\', '/').split("/"))
                 .filter(part -> !part.isEmpty() && !part.equals(".")).toList());
         String lower = n.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("templates/") || lower.startsWith("blocks/")) {
+        if (lower.startsWith(TEMPLATES_PREFIX) || lower.startsWith("blocks/")) {
             return n;
         }
-        return block ? "templates/blocks/" + n : "templates/" + n;
+        return block ? TEMPLATES_PREFIX + "blocks/" + n : TEMPLATES_PREFIX + n;
     }
 
     /** Shortest registration spelling that still resolves to the same module-relative path. */
     public static @NotNull String registrationName(@NotNull String relativePath) {
         String normalized = relativePath.replace('\\', '/');
-        String candidate = normalized.startsWith("templates/")
-                ? normalized.substring("templates/".length()) : normalized;
+        String candidate = normalized.startsWith(TEMPLATES_PREFIX)
+                ? normalized.substring(TEMPLATES_PREFIX.length()) : normalized;
         return diskPath(candidate, false).equals(normalized) ? candidate : normalized;
     }
 

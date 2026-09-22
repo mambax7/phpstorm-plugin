@@ -507,36 +507,36 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
 
     private static boolean hasUnprovenPolarity(@NotNull String condition) {
         // ponytail: only simple negated atoms are proven; other expression forms need PSI.
-        String operators = condition;
-        for (int i = 0; i < operators.length(); i++) {
-            if (operators.charAt(i) == '>' && i > 0 && operators.charAt(i - 1) == '-') {
+        for (int i = 0; i < condition.length(); i++) {
+            if (condition.charAt(i) == '>' && i > 0 && condition.charAt(i - 1) == '-') {
                 continue;
             }
-            if ("=<>?:".indexOf(operators.charAt(i)) >= 0) {
+            if ("=<>?:".indexOf(condition.charAt(i)) >= 0
+                    || condition.charAt(i) == '!' && hasUnprovenNegation(condition, i)) {
                 return true;
-            }
-            if (operators.charAt(i) == '!') {
-                int next = i + 1;
-                while (next < operators.length() && Character.isWhitespace(operators.charAt(next))) {
-                    next++;
-                }
-                if (next < operators.length() && operators.charAt(next) == '!') {
-                    return true;
-                }
-                if (next < operators.length() && operators.charAt(next) == '(') {
-                    int close = matchingCloseParen(operators, next);
-                    if (close < 0) {
-                        return true;
-                    }
-                    String group = operators.substring(next + 1, close);
-                    if (!NEG_IS_RESULT_SET.matcher(operators.substring(i, close + 1)).matches()
-                            && !INSTANCEOF_RESULT.matcher(group.strip()).matches()) {
-                        return true;
-                    }
-                }
             }
         }
         return false;
+    }
+
+    private static boolean hasUnprovenNegation(@NotNull String condition, int bangIndex) {
+        int next = bangIndex + 1;
+        while (next < condition.length() && Character.isWhitespace(condition.charAt(next))) {
+            next++;
+        }
+        if (next < condition.length() && condition.charAt(next) == '!') {
+            return true;
+        }
+        if (next >= condition.length() || condition.charAt(next) != '(') {
+            return false;
+        }
+        int close = matchingCloseParen(condition, next);
+        if (close < 0) {
+            return true;
+        }
+        String group = condition.substring(next + 1, close);
+        return !NEG_IS_RESULT_SET.matcher(condition.substring(bangIndex, close + 1)).matches()
+                && !INSTANCEOF_RESULT.matcher(group.strip()).matches();
     }
 
     private static boolean isInsidePositiveIsResultSetGuard(
