@@ -5,7 +5,6 @@ import com.intellij.codeInspection.ProblemsHolder;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.php.lang.psi.elements.Statement;
 import org.jetbrains.annotations.NotNull;
 import org.xoops.support.XoopsSupportPlugin;
@@ -60,10 +59,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     + "\\s*\\)?"
     );
 
-    private static final Pattern NEG_INSTANCEOF = Pattern.compile(
-            "(?is)!\\s*\\(?\\s*(\\$[A-Za-z_][\\w]*)\\s*instanceof"
-    );
-
     private static final Pattern INSTANCEOF_RESULT = Pattern.compile(
             "(?is)\\$[A-Za-z_][\\w]*\\s+instanceof\\s+\\\\?mysqli_result"
     );
@@ -101,7 +96,7 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
                     }
                     String message =
                             "XOOPS: call isResultSet($result) (and prefer mysqli_result check) before fetch*";
-                    Statement stmt = PsiTreeUtil.getParentOfType(leaf, Statement.class, false);
+                    Statement stmt = InsertBeforeStatementQuickFix.insertionStatement(leaf);
                     if (stmt == null) {
                         holder.registerProblem(leaf, message);
                         continue;
@@ -414,12 +409,6 @@ public final class XoopsResultSetGuardInspection extends LocalInspectionTool {
         Matcher m = NEG_IS_RESULT_SET.matcher(cond);
         while (m.find()) {
             if (resultVar.equals(m.group(1))) {
-                return true;
-            }
-        }
-        Matcher mi = NEG_INSTANCEOF.matcher(cond);
-        while (mi.find()) {
-            if (resultVar.equals(mi.group(1))) {
                 return true;
             }
         }

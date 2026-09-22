@@ -153,26 +153,29 @@ public final class PhpTextUtil {
                     while (i < n && chars[i] != '\n') {
                         i++;
                     }
-                    String body = text.substring(lineStart, i).strip();
-                    boolean closer = false;
-                    if (body.startsWith(ident)) {
-                        if (body.length() == ident.length()) {
-                            closer = true;
-                        } else {
-                            char next = body.charAt(ident.length());
-                            closer = !Character.isLetterOrDigit(next) && next != '_';
+                    int labelStart = lineStart;
+                    while (labelStart < i && (text.charAt(labelStart) == ' ' || text.charAt(labelStart) == '\t')) {
+                        labelStart++;
+                    }
+                    int labelEnd = labelStart + ident.length();
+                    boolean closer = labelEnd <= i && text.startsWith(ident, labelStart)
+                            && (labelEnd == i || !Character.isLetterOrDigit(text.charAt(labelEnd))
+                            && text.charAt(labelEnd) != '_');
+                    int maskEnd = closer ? labelEnd : i;
+                    if (maskStrings) {
+                        for (int k = lineStart; k < maskEnd; k++) {
+                            if (chars[k] != '\r') {
+                                chars[k] = ' ';
+                            }
                         }
                     }
-                    if (maskStrings) {
-                        for (int k = lineStart; k < i; k++) {
-                            chars[k] = ' ';
-                        }
+                    if (closer) {
+                        // Resume PHP at the suffix: punctuation, comments and code can share this line.
+                        i = labelEnd;
+                        break;
                     }
                     if (i < n) {
                         i++; // newline
-                    }
-                    if (closer) {
-                        break;
                     }
                 }
                 continue;

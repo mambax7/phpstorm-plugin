@@ -54,6 +54,7 @@ The counts are a quick health read: **TPL 0** means the module renders nothing o
 | `DEPRECATED_QUERY_F`, `DEPRECATED_QUOTE_STRING` | 4.1 `XoopsDeprecatedDbApi` |
 | `RAW_REQUEST` | 4.7 `XoopsSuperglobal`, `$_REQUEST` only; keyed `$_GET` / `$_POST` are left to the editor |
 | `MISSING_REGISTERED_TEMPLATE` | 4.8 `XoopsMissingRegisteredTemplate` |
+| `TEMPLATE_CASE_MISMATCH` | 4.8 `XoopsMissingRegisteredTemplate`: filename/directory spelling differs from disk |
 | `UNREGISTERED_TEMPLATE` | 4.9 `XoopsUnregisteredTemplate` |
 | `WRONG_SMARTY_DELIMITER` | 4.10 `XoopsWrongSmartyDelimiter` |
 | `SCAN_ERROR` | a file or directory the scanner could not read |
@@ -138,6 +139,8 @@ An early-exit guard covers later fetches of the same variable, including `while 
 - `&&`, `and` and `xor` in the guard condition disqualify it. `if (!isResultSet($r) && $x) return;` can fall through while `$r` is still `false`.
 - Comments and strings are masked first, so a commented-out guard never counts.
 
+**Guard quick-fix scope.** The guard is inserted within the existing statement list. Unbraced `if`, `while`, `for` and `foreach` bodies receive a warning without a quick-fix; add braces first so the guard can stay inside the control flow.
+
 ### 4.4 `include_once` for headers — `XoopsIncludeOnceHeader`
 
 XOOPS module entry points should load `header.php` / `footer.php` with `include_once` (not bare `include`).
@@ -220,7 +223,7 @@ $name = \Xmf\Request::getString('name', '', 'POST');
 
 ### 4.8 Missing registered template — `XoopsMissingRegisteredTemplate`
 
-A template listed in `xoops_version.php` (`file` / `template` key) was not found under the module `templates/` (or `blocks/`) directory.
+A template listed in `xoops_version.php` (`file` / `template` key) was not found under the module `templates/` (or `blocks/`) directory. A case-only difference is reported as `TEMPLATE_CASE_MISMATCH`, with the actual disk spelling and no create-file quick-fix.
 
 **Why.** On install and update XOOPS reads `$modversion['templates']` and copies each listed file into the `tplfile` table. A missing file is skipped without an error, so the page or block later fails with a Smarty "unable to read resource" message that names a template you registered but never created, or that was renamed on disk without the manifest following.
 

@@ -24,7 +24,7 @@ public final class XoopsMissingRegisteredTemplateInspection extends LocalInspect
                 if (!XoopsSupportPlugin.isEnabled(file) || !PhpTextUtil.isPrimaryPsiFile(file)) {
                     return;
                 }
-                if (!"xoops_version.php".equalsIgnoreCase(file.getName())) {
+                if (!"xoops_version.php".equalsIgnoreCase(file.getName()) || PhpTextUtil.looksLikeVendorOrCache(file)) {
                     return;
                 }
                 VirtualFile vf = file.getVirtualFile();

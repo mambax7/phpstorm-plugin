@@ -12,6 +12,7 @@ import com.jetbrains.php.lang.psi.elements.Statement;
 
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Inserts an isResultSet throw-guard immediately before the enclosing statement of
@@ -41,11 +42,10 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
         if (leaf == null) {
             return;
         }
-        Statement stmt = PsiTreeUtil.getParentOfType(leaf, Statement.class, false);
+        Statement stmt = insertionStatement(leaf);
         if (stmt == null) {
             return;
         }
-        stmt = outermostUnbracedAncestor(stmt);
         Document document = DocumentEditHelper.documentOf(project, leaf);
         if (document == null) {
             return;
@@ -73,22 +73,16 @@ public final class InsertBeforeStatementQuickFix implements LocalQuickFix {
         PsiDocumentManager.getInstance(project).commitDocument(document);
     }
 
-    /**
-     * When the statement is the sole, unbraced body of an if / while / for / foreach,
-     * inserting before it would put the guard inside that control structure and push
-     * the fetch out of it. Climb to the control statement instead (an early-exit guard
-     * before the loop is equivalent) and stop at the first enclosing {@code { }} block.
-     */
-    private static @NotNull Statement outermostUnbracedAncestor(@NotNull Statement stmt) {
-        Statement current = stmt;
-        while (true) {
-            Statement up = PsiTreeUtil.getParentOfType(current, Statement.class, true);
-            GroupStatement block = PsiTreeUtil.getParentOfType(current, GroupStatement.class, true);
-            if (up == null || (block != null && PsiTreeUtil.isAncestor(up, block, true))) {
-                return current;
-            }
-            current = up;
+    /** Only offer insertion where the fetch statement is already in a statement list. */
+    static @Nullable Statement insertionStatement(@NotNull PsiElement leaf) {
+        Statement stmt = PsiTreeUtil.getParentOfType(leaf, Statement.class, false);
+        if (stmt == null) {
+            return null;
         }
+        Statement up = PsiTreeUtil.getParentOfType(stmt, Statement.class, true);
+        GroupStatement block = PsiTreeUtil.getParentOfType(stmt, GroupStatement.class, true);
+        return up == null || up instanceof GroupStatement
+                || block != null && PsiTreeUtil.isAncestor(up, block, false) ? stmt : null;
     }
 
     static boolean assignsResultBeforeFetch(

@@ -59,7 +59,8 @@ public final class XoopsManifestTemplates {
                 searchFrom = stmt.end();
                 continue;
             }
-            int end = statementEnd(commentMasked, stmt.end());
+            int end = code.indexOf(';', stmt.end());
+            end = end < 0 ? code.length() : end + 1;
             Section section = "blocks".equalsIgnoreCase(stmt.group(1)) ? Section.BLOCKS : Section.TEMPLATES;
             Matcher m = FILE_OR_TEMPLATE.matcher(commentMasked);
             m.region(stmt.end(), end);
@@ -93,7 +94,8 @@ public final class XoopsManifestTemplates {
     public static @NotNull String diskPath(@NotNull String name, boolean block) {
         String n = String.join("/", Arrays.stream(name.replace('\\', '/').split("/"))
                 .filter(part -> !part.isEmpty() && !part.equals(".")).toList());
-        if (n.startsWith("templates/") || n.startsWith("blocks/")) {
+        String lower = n.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("templates/") || lower.startsWith("blocks/")) {
             return n;
         }
         return block ? "templates/blocks/" + n : "templates/" + n;
@@ -107,23 +109,4 @@ public final class XoopsManifestTemplates {
         return diskPath(candidate, false).equals(normalized) ? candidate : normalized;
     }
 
-    /** Offset just past the {@code ;} that ends the statement, skipping {@code ;} inside quotes. */
-    private static int statementEnd(@NotNull String text, int from) {
-        char quote = 0;
-        for (int i = from; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (quote != 0) {
-                if (c == '\\') {
-                    i++;
-                } else if (c == quote) {
-                    quote = 0;
-                }
-            } else if (c == '\'' || c == '"') {
-                quote = c;
-            } else if (c == ';') {
-                return i + 1;
-            }
-        }
-        return text.length();
-    }
 }
